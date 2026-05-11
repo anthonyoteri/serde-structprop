@@ -80,13 +80,15 @@ jobs:
     # Needs write access to commit the updated CHANGELOG.md.
     permissions:
       contents: write
+    # Serialize changelog runs so concurrent pushes don't cause non-fast-forward failures.
+    concurrency:
+      group: changelog
+      cancel-in-progress: false
 
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-          # Use a token so the push triggers downstream workflows.
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate changelog
         uses: cocogitto/cocogitto-action@v3
@@ -102,7 +104,9 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add CHANGELOG.md
+          # [skip ci] is natively honored by GitHub Actions for push-triggered workflows.
           git diff --cached --quiet || git commit -m "chore: update CHANGELOG.md [skip ci]"
+          git pull --rebase
           git push
 
   msrv:
