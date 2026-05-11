@@ -17,7 +17,6 @@ categories = ["encoding", "config"]
 # Re-export serde's derive macros. Enable this to use #[derive(Serialize, Deserialize)].
 derive = ["serde/derive"]
 
-<<<<<<< HEAD
 [dependencies]
 serde = { version = "1", default-features = false, features = ["std"] }
 indexmap = { version = "2" }
