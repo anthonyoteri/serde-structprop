@@ -2,6 +2,7 @@
 name = "serde-structprop"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.85"
 description = "Serde serializer and deserializer for the structprop config file format"
 license = "MIT"
 repository = "https://github.com/anthonyoteri/serde-structprop"
