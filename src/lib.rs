@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+#![deny(missing_docs)]
 //! # serde-structprop
 //!
 //! A [serde](https://serde.rs/) serializer and deserializer for the
