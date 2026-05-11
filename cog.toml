@@ -11,15 +11,6 @@ authors = [
     { username = "anthonyoteri", signature = "Anthony Oteri" },
 ]
 
-[changelog.sections]
-feat     = "Features"
-fix      = "Bug Fixes"
-perf     = "Performance"
-refactor = "Refactoring"
-docs     = "Documentation"
-test     = "Tests"
-chore    = "Miscellaneous"
-
 [commit_types]
 feat     = { changelog_title = "Features" }
 fix      = { changelog_title = "Bug Fixes" }
@@ -32,5 +23,5 @@ ci       = { changelog_title = "CI", omit_from_changelog = true }
 style    = { changelog_title = "Style", omit_from_changelog = true }
 
 [bump]
-# Automatically push the version tag after bumping.
+# Push is handled by the release workflow; disable auto-push here.
 push = false
