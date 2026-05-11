@@ -22,6 +22,3 @@ chore    = { changelog_title = "Miscellaneous" }
 ci       = { changelog_title = "CI", omit_from_changelog = true }
 style    = { changelog_title = "Style", omit_from_changelog = true }
 
-[bump]
-# Push is handled by the release workflow; disable auto-push here.
-push = false
