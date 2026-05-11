@@ -74,7 +74,10 @@ pub struct Serializer {
 impl Serializer {
     /// Create a new [`Serializer`] starting at `indent` spaces of indentation.
     fn new(indent: usize) -> Self {
-        Serializer { output: String::new(), indent }
+        Serializer {
+            output: String::new(),
+            indent,
+        }
     }
 
     /// Return a string of `self.indent` spaces.
@@ -90,7 +93,9 @@ impl Serializer {
 /// Wrap `s` in double quotes if it contains any structprop special characters
 /// (space, tab, `#`, `{`, `}`, or `=`); otherwise return it unchanged.
 fn escape(s: &str) -> String {
-    if s.chars().any(|c| matches!(c, ' ' | '\t' | '#' | '{' | '}' | '=')) {
+    if s.chars()
+        .any(|c| matches!(c, ' ' | '\t' | '#' | '{' | '}' | '='))
+    {
         format!("\"{s}\"")
     } else {
         s.to_owned()
@@ -229,15 +234,16 @@ impl<'a> ser::Serializer for &'a mut Serializer {
         let mut inner = Serializer::new(0);
         value.serialize(&mut inner)?;
         for line in inner.output.lines() {
-            writeln!(self.output, "{pad}  {line}")
-                .map_err(|e| Error::Message(e.to_string()))?;
+            writeln!(self.output, "{pad}  {line}").map_err(|e| Error::Message(e.to_string()))?;
         }
-        writeln!(self.output, "{pad}}}")
-            .map_err(|e| Error::Message(e.to_string()))
+        writeln!(self.output, "{pad}}}").map_err(|e| Error::Message(e.to_string()))
     }
 
     fn serialize_seq(self, _len: Option<usize>) -> Result<Self::SerializeSeq> {
-        Ok(SeqSerializer { parent: self, items: Vec::new() })
+        Ok(SeqSerializer {
+            parent: self,
+            items: Vec::new(),
+        })
     }
 
     fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple> {
@@ -448,9 +454,10 @@ impl ser::SerializeMap for MapSerializer<'_> {
     }
 
     fn serialize_value<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<()> {
-        let key = self.current_key.take().ok_or_else(|| {
-            Error::Parse("serialize_value called before serialize_key".into())
-        })?;
+        let key = self
+            .current_key
+            .take()
+            .ok_or_else(|| Error::Parse("serialize_value called before serialize_key".into()))?;
         self.write_kv(&key, value)
     }
 
@@ -471,7 +478,11 @@ impl ser::SerializeStruct for MapSerializer<'_> {
     type Ok = ();
     type Error = Error;
 
-    fn serialize_field<T: Serialize + ?Sized>(&mut self, key: &'static str, value: &T) -> Result<()> {
+    fn serialize_field<T: Serialize + ?Sized>(
+        &mut self,
+        key: &'static str,
+        value: &T,
+    ) -> Result<()> {
         self.write_kv(key, value)
     }
 
@@ -484,7 +495,11 @@ impl ser::SerializeStructVariant for MapSerializer<'_> {
     type Ok = ();
     type Error = Error;
 
-    fn serialize_field<T: Serialize + ?Sized>(&mut self, key: &'static str, value: &T) -> Result<()> {
+    fn serialize_field<T: Serialize + ?Sized>(
+        &mut self,
+        key: &'static str,
+        value: &T,
+    ) -> Result<()> {
         self.write_kv(key, value)
     }
 

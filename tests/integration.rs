@@ -166,7 +166,9 @@ fn ser_quoted_strings() {
     struct S {
         message: String,
     }
-    let s = S { message: "hello world".into() };
+    let s = S {
+        message: "hello world".into(),
+    };
     let out = to_string(&s).unwrap();
     assert!(out.contains(r#"message = "hello world""#), "got: {}", out);
 }
@@ -181,7 +183,9 @@ fn ser_nested_struct() {
     struct Outer {
         inner: Inner,
     }
-    let o = Outer { inner: Inner { x: 7 } };
+    let o = Outer {
+        inner: Inner { x: 7 },
+    };
     let out = to_string(&o).unwrap();
     assert!(out.contains("inner {"), "got: {}", out);
     assert!(out.contains("x = 7"), "got: {}", out);
@@ -193,7 +197,9 @@ fn ser_vec_of_strings() {
     struct S {
         items: Vec<String>,
     }
-    let s = S { items: vec!["a".into(), "b".into(), "c".into()] };
+    let s = S {
+        items: vec!["a".into(), "b".into(), "c".into()],
+    };
     let out = to_string(&s).unwrap();
     assert!(out.contains("items"), "got: {}", out);
     assert!(out.contains("a"), "got: {}", out);
@@ -206,7 +212,10 @@ fn ser_vec_of_strings() {
 
 #[test]
 fn roundtrip_simple() {
-    let original = Config { hostname: "myserver".into(), port: 3000 };
+    let original = Config {
+        hostname: "myserver".into(),
+        port: 3000,
+    };
     let serialized = to_string(&original).unwrap();
     let deserialized: Config = from_str(&serialized).unwrap();
     assert_eq!(original, deserialized);
@@ -227,7 +236,10 @@ fn roundtrip_nested() {
 
     let original = Outer {
         name: "test".into(),
-        inner: Inner { value: "foo".into(), count: 42 },
+        inner: Inner {
+            value: "foo".into(),
+            count: 42,
+        },
     };
     let serialized = to_string(&original).unwrap();
     let deserialized: Outer = from_str(&serialized).unwrap();
@@ -240,7 +252,9 @@ fn roundtrip_vec() {
     struct S {
         tags: Vec<String>,
     }
-    let original = S { tags: vec!["rust".into(), "serde".into(), "config".into()] };
+    let original = S {
+        tags: vec!["rust".into(), "serde".into(), "config".into()],
+    };
     let serialized = to_string(&original).unwrap();
     let deserialized: S = from_str(&serialized).unwrap();
     assert_eq!(original, deserialized);
@@ -254,7 +268,10 @@ fn roundtrip_vec() {
 fn de_parser_error_on_missing_term() {
     // A key with no value / block is a parse error.
     let result = from_str::<Simple>("hostname\n");
-    assert!(result.is_err(), "expected parse error for bare key with no value");
+    assert!(
+        result.is_err(),
+        "expected parse error for bare key with no value"
+    );
 }
 
 #[test]
@@ -345,7 +362,9 @@ fn ser_dump_list_exact() {
     struct S {
         a: Vec<String>,
     }
-    let s = S { a: vec!["a".into(), "b".into(), "c".into()] };
+    let s = S {
+        a: vec!["a".into(), "b".into(), "c".into()],
+    };
     let out = to_string(&s).unwrap();
     assert_eq!(out, "a = {\n  a\n  b\n  c\n}\n", "got: {out:?}");
 }
@@ -361,7 +380,9 @@ fn ser_dump_dict_exact() {
     struct Outer {
         a: Inner,
     }
-    let o = Outer { a: Inner { b: "c".into() } };
+    let o = Outer {
+        a: Inner { b: "c".into() },
+    };
     let out = to_string(&o).unwrap();
     assert_eq!(out, "a {\n  b = c\n}\n", "got: {out:?}");
 }
@@ -393,7 +414,10 @@ fn ser_escape_space_in_value() {
     struct S {
         msg: String,
     }
-    let out = to_string(&S { msg: "hello world".into() }).unwrap();
+    let out = to_string(&S {
+        msg: "hello world".into(),
+    })
+    .unwrap();
     assert!(out.contains(r#"msg = "hello world""#), "got: {out:?}");
 }
 
@@ -406,9 +430,17 @@ fn ser_object_order_is_kept() {
         second: u32,
         third: u32,
     }
-    let out = to_string(&S { first: 1, second: 2, third: 3 }).unwrap();
+    let out = to_string(&S {
+        first: 1,
+        second: 2,
+        third: 3,
+    })
+    .unwrap();
     let pos_first = out.find("first").unwrap();
     let pos_second = out.find("second").unwrap();
     let pos_third = out.find("third").unwrap();
-    assert!(pos_first < pos_second && pos_second < pos_third, "got: {out:?}");
+    assert!(
+        pos_first < pos_second && pos_second < pos_third,
+        "got: {out:?}"
+    );
 }

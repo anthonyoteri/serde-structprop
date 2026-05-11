@@ -139,9 +139,7 @@ fn parse_object(
                 if top_level {
                     break;
                 }
-                return Err(Error::Parse(
-                    "unexpected EOF inside object".to_owned(),
-                ));
+                return Err(Error::Parse("unexpected EOF inside object".to_owned()));
             }
             Token::Close => {
                 if top_level {
@@ -218,9 +216,7 @@ fn parse_array_or_object_list(tokens: &[Token], pos: &mut usize) -> Result<Value
                 break;
             }
             Token::Eof => {
-                return Err(Error::Parse(
-                    "unexpected EOF inside array".to_owned(),
-                ));
+                return Err(Error::Parse("unexpected EOF inside array".to_owned()));
             }
             Token::Open => {
                 // A nested object literal inside an array: { key = val … }

@@ -108,23 +108,25 @@ impl<'de> de::Deserializer<'de> for ValueDeserializer {
 
     fn deserialize_i8<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         let n = parse_int(&self.0)?;
-        visitor.visit_i8(i8::try_from(n).map_err(|_| {
-            Error::Parse(format!("value {n} out of range for i8"))
-        })?)
+        visitor.visit_i8(
+            i8::try_from(n).map_err(|_| Error::Parse(format!("value {n} out of range for i8")))?,
+        )
     }
 
     fn deserialize_i16<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         let n = parse_int(&self.0)?;
-        visitor.visit_i16(i16::try_from(n).map_err(|_| {
-            Error::Parse(format!("value {n} out of range for i16"))
-        })?)
+        visitor.visit_i16(
+            i16::try_from(n)
+                .map_err(|_| Error::Parse(format!("value {n} out of range for i16")))?,
+        )
     }
 
     fn deserialize_i32<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         let n = parse_int(&self.0)?;
-        visitor.visit_i32(i32::try_from(n).map_err(|_| {
-            Error::Parse(format!("value {n} out of range for i32"))
-        })?)
+        visitor.visit_i32(
+            i32::try_from(n)
+                .map_err(|_| Error::Parse(format!("value {n} out of range for i32")))?,
+        )
     }
 
     fn deserialize_i64<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
@@ -133,23 +135,25 @@ impl<'de> de::Deserializer<'de> for ValueDeserializer {
 
     fn deserialize_u8<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         let n = parse_uint(&self.0)?;
-        visitor.visit_u8(u8::try_from(n).map_err(|_| {
-            Error::Parse(format!("value {n} out of range for u8"))
-        })?)
+        visitor.visit_u8(
+            u8::try_from(n).map_err(|_| Error::Parse(format!("value {n} out of range for u8")))?,
+        )
     }
 
     fn deserialize_u16<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         let n = parse_uint(&self.0)?;
-        visitor.visit_u16(u16::try_from(n).map_err(|_| {
-            Error::Parse(format!("value {n} out of range for u16"))
-        })?)
+        visitor.visit_u16(
+            u16::try_from(n)
+                .map_err(|_| Error::Parse(format!("value {n} out of range for u16")))?,
+        )
     }
 
     fn deserialize_u32<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         let n = parse_uint(&self.0)?;
-        visitor.visit_u32(u32::try_from(n).map_err(|_| {
-            Error::Parse(format!("value {n} out of range for u32"))
-        })?)
+        visitor.visit_u32(
+            u32::try_from(n)
+                .map_err(|_| Error::Parse(format!("value {n} out of range for u32")))?,
+        )
     }
 
     fn deserialize_u64<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
@@ -277,16 +281,12 @@ impl<'de> de::Deserializer<'de> for ValueDeserializer {
                 // Newtype / tuple / struct variant: a single-entry object whose
                 // key is the variant name and whose value is the payload.
                 if map.len() != 1 {
-                    return Err(Error::Parse(
-                        "enum object must have exactly one key".into(),
-                    ));
+                    return Err(Error::Parse("enum object must have exactly one key".into()));
                 }
                 let (variant, payload) = map.into_iter().next().unwrap();
                 visitor.visit_enum(EnumDe { variant, payload })
             }
-            Value::Array(_) => {
-                Err(Error::Parse("expected scalar or object for enum".into()))
-            }
+            Value::Array(_) => Err(Error::Parse("expected scalar or object for enum".into())),
         }
     }
 
@@ -310,17 +310,16 @@ struct SeqDe {
 
 impl SeqDe {
     fn new(items: Vec<Value>) -> Self {
-        SeqDe { iter: items.into_iter() }
+        SeqDe {
+            iter: items.into_iter(),
+        }
     }
 }
 
 impl<'de> SeqAccess<'de> for SeqDe {
     type Error = Error;
 
-    fn next_element_seed<T: DeserializeSeed<'de>>(
-        &mut self,
-        seed: T,
-    ) -> Result<Option<T::Value>> {
+    fn next_element_seed<T: DeserializeSeed<'de>>(&mut self, seed: T) -> Result<Option<T::Value>> {
         match self.iter.next() {
             None => Ok(None),
             Some(v) => seed.deserialize(ValueDeserializer(v)).map(Some),
@@ -351,10 +350,7 @@ impl MapDe {
 impl<'de> MapAccess<'de> for MapDe {
     type Error = Error;
 
-    fn next_key_seed<K: DeserializeSeed<'de>>(
-        &mut self,
-        seed: K,
-    ) -> Result<Option<K::Value>> {
+    fn next_key_seed<K: DeserializeSeed<'de>>(&mut self, seed: K) -> Result<Option<K::Value>> {
         match self.iter.next() {
             None => Ok(None),
             Some((k, v)) => {
