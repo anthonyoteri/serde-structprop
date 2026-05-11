@@ -1,4 +1,4 @@
-#![warn(clippy::pedantic)]
+#![deny(clippy::all, clippy::pedantic)]
 #![deny(missing_docs)]
 //! # serde-structprop
 //!
