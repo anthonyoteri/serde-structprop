@@ -14,11 +14,13 @@ keywords = ["serde", "structprop", "config", "serialization"]
 categories = ["encoding", "config"]
 
 [features]
-# Re-export serde's derive macros. Enable this to use #[derive(Serialize, Deserialize)].
+# Enables serde's derive feature, allowing use of #[derive(Serialize, Deserialize)]
+# without adding a direct serde dependency. Requires serde to be in your own
+# [dependencies] if you need it for anything beyond derive macros.
 derive = ["serde/derive"]
 
 [dependencies]
-serde = { version = "1", default-features = false, features = ["std"] }
+serde = { version = "1" }
 indexmap = { version = "2" }
 
 [dev-dependencies]
