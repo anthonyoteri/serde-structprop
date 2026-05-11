@@ -245,3 +245,170 @@ fn roundtrip_vec() {
     let deserialized: S = from_str(&serialized).unwrap();
     assert_eq!(original, deserialized);
 }
+
+// ---------------------------------------------------------------------------
+// Python test-suite counterparts
+// ---------------------------------------------------------------------------
+
+#[test]
+fn de_parser_error_on_missing_term() {
+    // A key with no value / block is a parse error.
+    let result = from_str::<Simple>("hostname\n");
+    assert!(result.is_err(), "expected parse error for bare key with no value");
+}
+
+#[test]
+fn de_inline_comment() {
+    // Inline comments (after a value) should be ignored.
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct S {
+        key: String,
+    }
+    let input = "key = value # this is an inline comment\n";
+    let s: S = from_str(input).unwrap();
+    assert_eq!(s.key, "value");
+}
+
+#[test]
+fn de_quoted_key() {
+    // A quoted key should be parsed and the quotes stripped.
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct S {
+        my_key: String,
+    }
+    let input = "\"my_key\" = hello\n";
+    let s: S = from_str(input).unwrap();
+    assert_eq!(s.my_key, "hello");
+}
+
+#[test]
+fn de_empty_object() {
+    // An empty block should deserialise without error.
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct Inner {}
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct Outer {
+        section: Inner,
+    }
+    let input = "section {\n}\n";
+    let outer: Outer = from_str(input).unwrap();
+    let _ = outer; // just assert no panic / error
+}
+
+#[test]
+fn de_object_key_value_single_line() {
+    // Block with a single key = value entry.
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct Inner {
+        x: u32,
+    }
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct Outer {
+        section: Inner,
+    }
+    let input = "section {\n  x = 42\n}\n";
+    let outer: Outer = from_str(input).unwrap();
+    assert_eq!(outer.section.x, 42);
+}
+
+#[test]
+fn de_nested_objects_mixed_array() {
+    // Nested block that also contains an array.
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct Inner {
+        tags: Vec<String>,
+    }
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct Outer {
+        section: Inner,
+    }
+    let input = "section {\n  tags = { alpha beta }\n}\n";
+    let outer: Outer = from_str(input).unwrap();
+    assert_eq!(outer.section.tags, vec!["alpha", "beta"]);
+}
+
+#[test]
+fn de_false_bool() {
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct S {
+        flag: bool,
+    }
+    let input = "flag = false\n";
+    let s: S = from_str(input).unwrap();
+    assert!(!s.flag);
+}
+
+#[test]
+fn ser_dump_list_exact() {
+    // Mirrors the Python `test_dump_list` expectation.
+    #[derive(Serialize)]
+    struct S {
+        a: Vec<String>,
+    }
+    let s = S { a: vec!["a".into(), "b".into(), "c".into()] };
+    let out = to_string(&s).unwrap();
+    assert_eq!(out, "a = {\n  a\n  b\n  c\n}\n", "got: {out:?}");
+}
+
+#[test]
+fn ser_dump_dict_exact() {
+    // Mirrors the Python `test_dump_dict` expectation.
+    #[derive(Serialize)]
+    struct Inner {
+        b: String,
+    }
+    #[derive(Serialize)]
+    struct Outer {
+        a: Inner,
+    }
+    let o = Outer { a: Inner { b: "c".into() } };
+    let out = to_string(&o).unwrap();
+    assert_eq!(out, "a {\n  b = c\n}\n", "got: {out:?}");
+}
+
+#[test]
+fn ser_dump_true_bool() {
+    #[derive(Serialize)]
+    struct S {
+        flag: bool,
+    }
+    let out = to_string(&S { flag: true }).unwrap();
+    assert_eq!(out, "flag = true\n");
+}
+
+#[test]
+fn ser_dump_false_bool() {
+    #[derive(Serialize)]
+    struct S {
+        flag: bool,
+    }
+    let out = to_string(&S { flag: false }).unwrap();
+    assert_eq!(out, "flag = false\n");
+}
+
+#[test]
+fn ser_escape_space_in_value() {
+    // Values containing spaces must be quoted on output.
+    #[derive(Serialize)]
+    struct S {
+        msg: String,
+    }
+    let out = to_string(&S { msg: "hello world".into() }).unwrap();
+    assert!(out.contains(r#"msg = "hello world""#), "got: {out:?}");
+}
+
+#[test]
+fn ser_object_order_is_kept() {
+    // Field declaration order must be preserved in serialized output.
+    #[derive(Serialize)]
+    struct S {
+        first: u32,
+        second: u32,
+        third: u32,
+    }
+    let out = to_string(&S { first: 1, second: 2, third: 3 }).unwrap();
+    let pos_first = out.find("first").unwrap();
+    let pos_second = out.find("second").unwrap();
+    let pos_third = out.find("third").unwrap();
+    assert!(pos_first < pos_second && pos_second < pos_third, "got: {out:?}");
+}

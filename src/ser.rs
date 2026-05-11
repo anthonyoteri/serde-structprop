@@ -399,19 +399,35 @@ impl MapSerializer<'_> {
         let indent = self.ser.indent;
         let pad = " ".repeat(indent);
 
-        // Serialize the value into a temporary buffer to determine its shape.
-        let mut inner = Serializer::new(indent + 2);
+        // Render at indent=0 so SeqSerializer / MapSerializer do not add their
+        // own base indentation; we re-apply `pad` below.
+        let mut inner = Serializer::new(0);
         value.serialize(&mut inner)?;
         let rendered = inner.output;
 
         if rendered.contains('\n') && !rendered.trim_start().starts_with('{') {
-            // Multi-line object block → `key {\n … \n}\n`
+            // Multi-line object block → `key {\n  …lines re-indented…\n}\n`
             writeln!(self.ser.output, "{pad}{} {{", escape(key))
                 .map_err(|e| Error::Message(e.to_string()))?;
-            self.ser.output.push_str(&rendered);
+            for line in rendered.lines() {
+                writeln!(self.ser.output, "{pad}  {line}")
+                    .map_err(|e| Error::Message(e.to_string()))?;
+            }
             writeln!(self.ser.output, "{pad}}}").map_err(|e| Error::Message(e.to_string()))?;
+        } else if rendered.contains('\n') {
+            // Multi-line array block starting with `{`.
+            // First line (`{`) goes inline with `key = `; remaining lines get
+            // `pad` prepended so items sit at `indent+2` and `}` at `indent`.
+            let mut lines = rendered.lines();
+            let first = lines.next().unwrap_or("{");
+            writeln!(self.ser.output, "{pad}{} = {first}", escape(key))
+                .map_err(|e| Error::Message(e.to_string()))?;
+            for line in lines {
+                writeln!(self.ser.output, "{pad}{line}")
+                    .map_err(|e| Error::Message(e.to_string()))?;
+            }
         } else {
-            // Scalar or inline `{ … }` array.
+            // Scalar (no newlines at all).
             let rendered = rendered.trim_end_matches('\n');
             writeln!(self.ser.output, "{pad}{} = {rendered}", escape(key))
                 .map_err(|e| Error::Message(e.to_string()))?;
