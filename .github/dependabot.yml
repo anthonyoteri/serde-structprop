@@ -7,6 +7,13 @@ updates:
       interval: weekly
     labels:
       - dependencies
+    groups:
+      # Patch and minor bumps are considered low-risk and will be auto-merged
+      # by the dependabot-automerge workflow.
+      patch-and-minor:
+        update-types:
+          - "semver:patch"
+          - "semver:minor"
 
   - package-ecosystem: github-actions
     directory: "/"
@@ -14,3 +21,9 @@ updates:
       interval: weekly
     labels:
       - dependencies
+    groups:
+      # All Actions version bumps (always pinned to a SHA or tag) are low-risk.
+      all-actions:
+        update-types:
+          - "version-update:semver-patch"
+          - "version-update:semver-minor"
