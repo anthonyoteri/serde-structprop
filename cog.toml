@@ -1,0 +1,36 @@
+# Cocogitto configuration
+# https://docs.cocogitto.io/config/
+
+[changelog]
+path = "CHANGELOG.md"
+template = "remote"
+remote = "github.com"
+repository = "serde-structprop"
+owner = "anthonyoteri"
+authors = [
+    { username = "anthonyoteri", signature = "Anthony Oteri" },
+]
+
+[changelog.sections]
+feat     = "Features"
+fix      = "Bug Fixes"
+perf     = "Performance"
+refactor = "Refactoring"
+docs     = "Documentation"
+test     = "Tests"
+chore    = "Miscellaneous"
+
+[commit_types]
+feat     = { changelog_title = "Features" }
+fix      = { changelog_title = "Bug Fixes" }
+perf     = { changelog_title = "Performance" }
+refactor = { changelog_title = "Refactoring" }
+docs     = { changelog_title = "Documentation" }
+test     = { changelog_title = "Tests" }
+chore    = { changelog_title = "Miscellaneous" }
+ci       = { changelog_title = "CI", omit_from_changelog = true }
+style    = { changelog_title = "Style", omit_from_changelog = true }
+
+[bump]
+# Automatically push the version tag after bumping.
+push = false
