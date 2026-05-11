@@ -1,5 +1,3 @@
-#![deny(clippy::all, clippy::pedantic)]
-#![deny(missing_docs)]
 //! # serde-structprop
 //!
 //! A [serde](https://serde.rs/) serializer and deserializer for the
@@ -57,6 +55,9 @@
 //! | [`de`] | `serde::Deserializer` implementation |
 //! | [`ser`] | `serde::Serializer` implementation |
 //! | [`error`] | [`Error`] type shared by all modules |
+
+#![deny(clippy::all, clippy::pedantic)]
+#![deny(missing_docs)]
 
 /// Serde deserializer for structprop documents.
 pub mod de;
