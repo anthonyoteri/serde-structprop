@@ -25,7 +25,7 @@ fn de_quoted_value() {
     struct S {
         message: String,
     }
-    let input = r#"message = "hello world""#;
+    let input = "message = \"hello world\"";
     let s: S = from_str(input).unwrap();
     assert_eq!(s.message, "hello world");
 }
@@ -33,13 +33,13 @@ fn de_quoted_value() {
 #[test]
 fn de_nested_struct() {
     #[derive(Debug, Deserialize, PartialEq)]
-    struct Database {
+    struct DbConn {
         hostname: String,
         port: u16,
     }
     #[derive(Debug, Deserialize, PartialEq)]
     struct Config {
-        database: Database,
+        database: DbConn,
     }
 
     let input = "database {\n  hostname = localhost\n  port = 5432\n}\n";
@@ -104,38 +104,38 @@ fn de_comments_ignored() {
 fn de_full_example() {
     // Mirrors the README example from structprop.
     #[derive(Debug, Deserialize, PartialEq)]
-    struct Database {
+    struct DbConn {
         hostname: String,
         username: String,
         password: String,
         port: u16,
-        database: String,
+        name: String,
     }
     #[derive(Debug, Deserialize, PartialEq)]
     struct Config {
-        database: Database,
+        database: DbConn,
         tables: Vec<String>,
     }
 
-    let input = r#"
+    let input = "
 # This is a simple example config file
 database {
   hostname = localhost
   username = dbuser
   password = secret
   port = 12361
-  database = TheDatabase
+  name = TheDatabase
 }
 
 tables = { Table1 Table2 }
-"#;
+";
 
     let cfg: Config = from_str(input).unwrap();
     assert_eq!(cfg.database.hostname, "localhost");
     assert_eq!(cfg.database.username, "dbuser");
     assert_eq!(cfg.database.password, "secret");
     assert_eq!(cfg.database.port, 12361);
-    assert_eq!(cfg.database.database, "TheDatabase");
+    assert_eq!(cfg.database.name, "TheDatabase");
     assert_eq!(cfg.tables, vec!["Table1", "Table2"]);
 }
 
@@ -156,8 +156,8 @@ fn ser_simple_struct() {
         port: 8080,
     };
     let out = to_string(&cfg).unwrap();
-    assert!(out.contains("hostname = localhost"), "got: {}", out);
-    assert!(out.contains("port = 8080"), "got: {}", out);
+    assert!(out.contains("hostname = localhost"), "got: {out}");
+    assert!(out.contains("port = 8080"), "got: {out}");
 }
 
 #[test]
@@ -170,7 +170,7 @@ fn ser_quoted_strings() {
         message: "hello world".into(),
     };
     let out = to_string(&s).unwrap();
-    assert!(out.contains(r#"message = "hello world""#), "got: {}", out);
+    assert!(out.contains("message = \"hello world\""), "got: {out}");
 }
 
 #[test]
@@ -187,8 +187,8 @@ fn ser_nested_struct() {
         inner: Inner { x: 7 },
     };
     let out = to_string(&o).unwrap();
-    assert!(out.contains("inner {"), "got: {}", out);
-    assert!(out.contains("x = 7"), "got: {}", out);
+    assert!(out.contains("inner {"), "got: {out}");
+    assert!(out.contains("x = 7"), "got: {out}");
 }
 
 #[test]
@@ -201,9 +201,9 @@ fn ser_vec_of_strings() {
         items: vec!["a".into(), "b".into(), "c".into()],
     };
     let out = to_string(&s).unwrap();
-    assert!(out.contains("items"), "got: {}", out);
-    assert!(out.contains("a"), "got: {}", out);
-    assert!(out.contains("b"), "got: {}", out);
+    assert!(out.contains("items"), "got: {out}");
+    assert!(out.contains('a'), "got: {out}");
+    assert!(out.contains('b'), "got: {out}");
 }
 
 // ---------------------------------------------------------------------------
@@ -418,7 +418,7 @@ fn ser_escape_space_in_value() {
         msg: "hello world".into(),
     })
     .unwrap();
-    assert!(out.contains(r#"msg = "hello world""#), "got: {out:?}");
+    assert!(out.contains("msg = \"hello world\""), "got: {out:?}");
 }
 
 #[test]
