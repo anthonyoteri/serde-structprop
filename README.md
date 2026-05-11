@@ -1,5 +1,7 @@
 # serde-structprop
 
+[![CI](https://github.com/anthonyoteri/serde-structprop/actions/workflows/ci.yml/badge.svg)](https://github.com/anthonyoteri/serde-structprop/actions/workflows/ci.yml)
+
 A [serde](https://serde.rs/) serializer and deserializer for the
 [structprop](https://github.com/edgeware/structprop) configuration file format —
 a simple, human-readable format for structured data.
