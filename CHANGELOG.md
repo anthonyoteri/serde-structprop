@@ -2,6 +2,14 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v0.1.3](https://github.com/anthonyoteri/serde-structprop/compare/9e2f5055f3c4f6787a19165fbc32d4a0714b8a76..v0.1.3) - 2026-05-12
+#### Bug Fixes
+- (**release**) regenerate Cargo.lock in pre_bump_hooks (#23) - ([9e2f505](https://github.com/anthonyoteri/serde-structprop/commit/9e2f5055f3c4f6787a19165fbc32d4a0714b8a76)) - [@anthonyoteri](https://github.com/anthonyoteri)
+#### Miscellaneous
+- remove Cargo.lock (library crate) (#24) - ([9d1c3ed](https://github.com/anthonyoteri/serde-structprop/commit/9d1c3edfe5d3868e25438d63689b5a9c33b6dc16)) - [@anthonyoteri](https://github.com/anthonyoteri)
+
+- - -
+
 ## [v0.1.2](https://github.com/anthonyoteri/serde-structprop/compare/6db14b5356b25d25eeff5c3c94e506c06a671ec3..v0.1.2) - 2026-05-12
 #### Bug Fixes
 - (**release**) drop cargo build from pre_bump_hooks (#21) - ([6db14b5](https://github.com/anthonyoteri/serde-structprop/commit/6db14b5356b25d25eeff5c3c94e506c06a671ec3)) - [@anthonyoteri](https://github.com/anthonyoteri)
