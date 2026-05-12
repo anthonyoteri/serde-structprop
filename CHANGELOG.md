@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v0.1.2](https://github.com/anthonyoteri/serde-structprop/compare/6db14b5356b25d25eeff5c3c94e506c06a671ec3..v0.1.2) - 2026-05-12
+#### Bug Fixes
+- (**release**) drop cargo build from pre_bump_hooks (#21) - ([6db14b5](https://github.com/anthonyoteri/serde-structprop/commit/6db14b5356b25d25eeff5c3c94e506c06a671ec3)) - [@anthonyoteri](https://github.com/anthonyoteri)
+
+- - -
+
 ## [v0.1.1](https://github.com/anthonyoteri/serde-structprop/compare/a4e598c415086d1ede3d47a287fe0dcfaefb346d..v0.1.1) - 2026-05-12
 #### Bug Fixes
 - add v prefix to cog tags to match release.yml trigger (#17) - ([080bd5e](https://github.com/anthonyoteri/serde-structprop/commit/080bd5e176064340f115295fc8e40ca84aa59df6)) - [@anthonyoteri](https://github.com/anthonyoteri)
