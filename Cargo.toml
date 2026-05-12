@@ -12,6 +12,12 @@ documentation = "https://docs.rs/serde-structprop"
 readme = "README.md"
 keywords = ["serde", "structprop", "config", "serialization"]
 categories = ["encoding", "config"]
+exclude = [
+    ".github/",
+    "deny.toml",
+    "SECURITY.md",
+    "Justfile",
+]
 
 [features]
 # Enables serde's derive feature, allowing use of #[derive(Serialize, Deserialize)]
