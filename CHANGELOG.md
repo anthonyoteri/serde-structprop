@@ -2,6 +2,21 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v0.1.4](https://github.com/anthonyoteri/serde-structprop/compare/62e3dc154ef7e23f1b8e0aee8fd148cdd962d87e..v0.1.4) - 2026-05-12
+#### Bug Fixes
+- quote empty strings in serializer (#26) - ([ff5a8d9](https://github.com/anthonyoteri/serde-structprop/commit/ff5a8d97f001ef3d49c53542bea10c2d22bea7f1)) - [@anthonyoteri](https://github.com/anthonyoteri)
+#### Documentation
+- expand inline docs and README for de, ser, parse, and error modules (#32) - ([0c1840d](https://github.com/anthonyoteri/serde-structprop/commit/0c1840d870a9f0d0f0cdc2c39da3a0a7cfb6ad35)) - [@anthonyoteri](https://github.com/anthonyoteri)
+- add crates.io, docs.rs, MSRV, and license badges to README (#31) - ([f7eac76](https://github.com/anthonyoteri/serde-structprop/commit/f7eac7663a65778fa322a4745dc654bd66beff55)) - [@anthonyoteri](https://github.com/anthonyoteri)
+#### Tests
+- add comprehensive integration tests for primitive and rich types (#27) - ([35514ae](https://github.com/anthonyoteri/serde-structprop/commit/35514aee3de4bc845a9f170ff69f249f031c7862)) - [@anthonyoteri](https://github.com/anthonyoteri)
+#### Refactoring
+- eliminate .unwrap() in deserialize_enum (#28) - ([3a93eb8](https://github.com/anthonyoteri/serde-structprop/commit/3a93eb82182f5c3c8ca07b7b09f161e847ef863c)) - [@anthonyoteri](https://github.com/anthonyoteri)
+#### Miscellaneous
+- add SECURITY.md and exclude dev-only files from crates.io package (#33) - ([e2331e5](https://github.com/anthonyoteri/serde-structprop/commit/e2331e5b2ef57054cc7ef700c4666ea192771494)) - [@anthonyoteri](https://github.com/anthonyoteri)
+
+- - -
+
 ## [v0.1.3](https://github.com/anthonyoteri/serde-structprop/compare/9e2f5055f3c4f6787a19165fbc32d4a0714b8a76..v0.1.3) - 2026-05-12
 #### Bug Fixes
 - (**release**) regenerate Cargo.lock in pre_bump_hooks (#23) - ([9e2f505](https://github.com/anthonyoteri/serde-structprop/commit/9e2f5055f3c4f6787a19165fbc32d4a0714b8a76)) - [@anthonyoteri](https://github.com/anthonyoteri)
