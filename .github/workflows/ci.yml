@@ -110,6 +110,29 @@ jobs:
           git pull --rebase
           git push
 
+  semver:
+    name: Semver compatibility
+    runs-on: ubuntu-latest
+    # Only meaningful on PRs — compares the PR branch against the published
+    # crate version to catch accidental breaking API changes.
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check semver compatibility
+        uses: obi1kenobi/cargo-semver-checks-action@v2
+        # The crate must be published on crates.io for semver-checks to have a
+        # baseline to compare against.  Until the first publish this step is
+        # expected to fail; we allow it so CI doesn't block PRs unnecessarily.
+        continue-on-error: true
+
   msrv:
     name: MSRV
     runs-on: ubuntu-latest
