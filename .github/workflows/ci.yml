@@ -74,41 +74,28 @@ jobs:
           from: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
 
   changelog:
-    name: Update changelog
+    name: Verify changelog
     runs-on: ubuntu-latest
     # Only run on pushes to main, not on PRs.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    # Needs write access to commit the updated CHANGELOG.md.
-    permissions:
-      contents: write
-    # Serialize changelog runs so concurrent pushes don't cause non-fast-forward failures.
-    concurrency:
-      group: changelog
-      cancel-in-progress: false
 
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - name: Generate changelog
+      - name: Install cocogitto
         uses: cocogitto/cocogitto-action@v3
         with:
           check: false
-          git-user: "github-actions[bot]"
-          git-user-email: "github-actions[bot]@users.noreply.github.com"
           release: false
 
-      - name: Commit updated CHANGELOG.md
-        run: |
-          cog changelog > CHANGELOG.md
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add CHANGELOG.md
-          # [skip ci] is natively honored by GitHub Actions for push-triggered workflows.
-          git diff --cached --quiet || git commit -m "chore: update CHANGELOG.md [skip ci]"
-          git pull --rebase
-          git push
+      - name: Verify changelog generation
+        # Confirm that cog can generate a changelog from the current history.
+        # The authoritative CHANGELOG.md is produced locally by maintainers
+        # running `cog bump --auto` before pushing a version tag; it is not
+        # written by CI because main is branch-protected.
+        run: cog changelog > CHANGELOG.md
 
   semver:
     name: Semver compatibility

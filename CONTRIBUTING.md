@@ -91,17 +91,31 @@ cog check
    all pass.
 4. Open a pull request against `main` and fill in the PR template.
 
+## Releasing
+
+Releases are managed by maintainers.  The easiest path is the `just release`
+recipe, which runs all pre-flight checks and then automates every step:
+
+```
+just release
+```
+
+This will:
+1. Verify you are on `main`, the tree is clean, and local `main` is not behind `origin/main`.
+2. Run `cargo test`, `cargo fmt --check`, and `cargo clippy`.
+3. Run `cog bump --auto` to determine the next semver version from the commit
+   history, update `Cargo.toml`, generate `CHANGELOG.md`, and create a commit
+   and annotated tag.
+4. Push the bump commit and tag — the tag push triggers the CI release workflow,
+   which publishes to crates.io and creates a GitHub release.
+
+If you prefer to run the steps manually:
+
+```
+cog bump --auto          # bump version, write CHANGELOG.md, commit, tag
+git push origin main --follow-tags   # trigger the release workflow
+```
+
 Breaking changes (anything that changes the public API) require a
 `BREAKING CHANGE:` footer in the commit body so that `cog bump` can correctly
 determine the next semver version.
-
-## Releasing
-
-Releases are managed by maintainers using `cocogitto`:
-
-```
-cog bump --auto   # determines version from commit history and tags
-```
-
-The CI release workflow then publishes to crates.io automatically when a
-version tag is pushed.
