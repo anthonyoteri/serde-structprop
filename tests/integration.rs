@@ -512,7 +512,9 @@ fn ser_string_with_newline_is_quoted() {
     struct S {
         msg: String,
     }
-    let s = S { msg: "hello\nworld".into() };
+    let s = S {
+        msg: "hello\nworld".into(),
+    };
     let out = to_string(&s).unwrap();
     // A bare newline in the output would break the line-oriented parser.
     // The value must be wrapped in quotes.
@@ -536,7 +538,10 @@ fn ser_char_special_chars_are_quoted() {
         let s = S { c: special };
         let out = to_string(&s).unwrap();
         let back: S = from_str(&out).unwrap();
-        assert_eq!(back, s, "char '{special}' did not round-trip; output was:\n{out}");
+        assert_eq!(
+            back, s,
+            "char '{special}' did not round-trip; output was:\n{out}"
+        );
     }
 }
 
@@ -545,11 +550,14 @@ fn ser_char_special_chars_are_quoted() {
 fn de_duplicate_key_is_an_error() {
     #[derive(Debug, Deserialize)]
     struct S {
-        port: u32,
+        _port: u32,
     }
     let input = "port = 1234\nport = 5678\n";
     let result: Result<S, _> = from_str(input);
-    assert!(result.is_err(), "expected error for duplicate key, got {result:?}");
+    assert!(
+        result.is_err(),
+        "expected error for duplicate key, got {result:?}"
+    );
 }
 
 // Cycle 6: unterminated quoted string must produce an error, not silently drop content
@@ -557,11 +565,14 @@ fn de_duplicate_key_is_an_error() {
 fn de_unterminated_quoted_string_is_an_error() {
     #[derive(Debug, Deserialize)]
     struct S {
-        key: String,
+        _key: String,
     }
     let input = "key = \"unterminated";
     let result: Result<S, _> = from_str(input);
-    assert!(result.is_err(), "expected error for unterminated string, got {result:?}");
+    assert!(
+        result.is_err(),
+        "expected error for unterminated string, got {result:?}"
+    );
 }
 
 // Cycle 7: large integer (> i64::MAX) must not silently become a float
@@ -571,7 +582,9 @@ fn de_large_integer_is_not_silently_coerced_to_float() {
     // fall through i64 parse failure → f64 parse, silently losing precision.
     let input = format!("val = {}\n", u64::MAX);
     #[derive(Debug, Deserialize)]
-    struct S { val: u64 }
+    struct S {
+        val: u64,
+    }
     let s: S = from_str(&input).unwrap();
     assert_eq!(s.val, u64::MAX);
 }
@@ -640,7 +653,10 @@ fn roundtrip_option_none() {
     // None serializes to `null`; must deserialize back to None.
     let s = S { value: None };
     let out = to_string(&s).unwrap();
-    assert!(out.contains("null"), "expected 'null' in output, got:\n{out}");
+    assert!(
+        out.contains("null"),
+        "expected 'null' in output, got:\n{out}"
+    );
     let back: S = from_str(&out).unwrap();
     assert_eq!(back, s);
 }
