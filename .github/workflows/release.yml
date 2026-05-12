@@ -65,8 +65,8 @@ jobs:
           URL="https://crates.io/api/v1/crates/serde-structprop/${VERSION}"
           echo "Polling ${URL} ..."
           for i in $(seq 1 24); do
-            STATUS=$(curl -sf -o /dev/null -w "%{http_code}" \
-              -H "User-Agent: serde-structprop-release-ci" "${URL}") && \
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+              -H "User-Agent: serde-structprop-release-ci" "${URL}")
             if [ "$STATUS" = "200" ]; then
               echo "serde-structprop ${VERSION} is available on crates.io"
               exit 0
