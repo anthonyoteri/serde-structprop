@@ -42,7 +42,7 @@ fn run(args: &[String]) -> Result<()> {
                 {
                     Ok(input) => {
                         if let Err(e) = validate(&p.display().to_string(), &input) {
-                            eprintln!("{e:#}");
+                            eprintln!("error: {e:#}");
                             had_error = true;
                         }
                     }

@@ -139,13 +139,22 @@ push-tag:
     echo "==> Pulling latest main..."
     git pull --ff-only origin main
 
-    # Find the most recent local vX.Y.Z tag left by `cog bump --auto`.
-    tag=$(git tag --list 'v*.*.*' --sort=-version:refname | head -1)
-    if [[ -z "$tag" ]]; then
-        echo "error: no local vX.Y.Z tag found — did you run 'just release' first?" >&2
+    # Derive the version from crates/serde-structprop/Cargo.toml (set by
+    # `cog bump --auto` via pre_bump_hooks) and verify that
+    # structprop-validator is in lockstep.
+    version=$(grep '^version' crates/serde-structprop/Cargo.toml | head -1 \
+                | sed 's/version = "\(.*\)"/\1/')
+    if [[ -z "$version" ]]; then
+        echo "error: could not read version from crates/serde-structprop/Cargo.toml" >&2
         exit 1
     fi
-    version="${tag#v}"
+    val_version=$(grep '^version' crates/structprop-validator/Cargo.toml | head -1 \
+                    | sed 's/version = "\(.*\)"/\1/')
+    if [[ "$val_version" != "$version" ]]; then
+        echo "error: version mismatch — serde-structprop=${version}, structprop-validator=${val_version}" >&2
+        exit 1
+    fi
+    tag="v${version}"
     echo "==> Tagging HEAD as ${tag}..."
 
     # Guard: tag must not already exist on origin.

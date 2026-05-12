@@ -62,8 +62,8 @@ enum State {
 ///
 /// # Errors
 ///
-/// Returns [`crate::Error::Parse`] if the input contains more than
-/// [`u32::MAX`] newlines.
+/// Returns [`crate::Error::Parse`] if the input contains [`u32::MAX`] or
+/// more newlines (i.e. the file exceeds [`u32::MAX`] lines).
 ///
 /// # Examples
 ///

@@ -3,7 +3,7 @@
 [![CI](https://github.com/anthonyoteri/serde-structprop/actions/workflows/ci.yml/badge.svg)](https://github.com/anthonyoteri/serde-structprop/actions/workflows/ci.yml)
 [![crates.io](https://img.shields.io/crates/v/structprop-validator.svg)](https://crates.io/crates/structprop-validator)
 [![Rust version](https://img.shields.io/badge/rustc-1.85+-orange.svg)](https://blog.rust-lang.org/2025/02/20/Rust-1.85.0.html)
-[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE-MIT)
+[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](https://github.com/anthonyoteri/serde-structprop/blob/main/LICENSE-MIT)
 
 A command-line tool that validates [structprop](https://github.com/edgeware/structprop)
 configuration files, reporting parse errors with line numbers.
