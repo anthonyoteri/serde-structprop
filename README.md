@@ -49,7 +49,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-serde-structprop = { version = "0.1.3", features = ["derive"] }
+serde-structprop = { version = "0.1", features = ["derive"] }
 ```
 
 The `derive` feature re-exports serde's derive macros so you can use
@@ -59,7 +59,7 @@ If you already depend on `serde` directly, you can omit the feature:
 ```toml
 [dependencies]
 serde = { version = "1", features = ["derive"] }
-serde-structprop = "0.1.3"
+serde-structprop = "0.1"
 ```
 
 ## Type mapping
