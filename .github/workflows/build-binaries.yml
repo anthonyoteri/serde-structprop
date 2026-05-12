@@ -27,22 +27,22 @@ jobs:
         include:
           - os: ubuntu-latest
             artifact: structprop-validator
-            asset_name: structprop-validator-linux-x86_64
+            upload_name: structprop-validator-linux-x86_64.tar.gz
             target: x86_64-unknown-linux-musl
             artifact_dir: target/x86_64-unknown-linux-musl/release
           - os: macos-13
             artifact: structprop-validator
-            asset_name: structprop-validator-macos-x86_64
+            upload_name: structprop-validator-macos-x86_64.tar.gz
             target: ""
             artifact_dir: target/release
           - os: macos-latest
             artifact: structprop-validator
-            asset_name: structprop-validator-macos-aarch64
+            upload_name: structprop-validator-macos-aarch64.tar.gz
             target: ""
             artifact_dir: target/release
           - os: windows-latest
             artifact: structprop-validator.exe
-            asset_name: structprop-validator-windows-x86_64.exe
+            upload_name: structprop-validator-windows-x86_64.exe
             target: ""
             artifact_dir: target/release
 
@@ -72,10 +72,17 @@ jobs:
         if: runner.os != 'Windows'
         run: strip ${{ matrix.artifact_dir }}/${{ matrix.artifact }}
 
-      - name: Upload binary to GitHub release
-        run: >
-          gh release upload "${{ inputs.tag }}"
-          "${{ matrix.artifact_dir }}/${{ matrix.artifact }}#${{ matrix.asset_name }}"
-          --clobber
+      - name: Package binary (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: tar -czf "${{ matrix.upload_name }}" -C "${{ matrix.artifact_dir }}" "${{ matrix.artifact }}"
+
+      - name: Copy binary (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: cp "${{ matrix.artifact_dir }}/${{ matrix.artifact }}" "${{ matrix.upload_name }}"
+
+      - name: Upload to GitHub release
+        run: gh release upload "${{ inputs.tag }}" "${{ matrix.upload_name }}" --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
