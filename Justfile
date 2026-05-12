@@ -33,7 +33,8 @@ commits:
 #     branch, opens a PR.  Review and merge the PR normally.
 #
 #   Step 2 — just push-tag
-#     After the PR is merged, pushes the local tag created by cog.
+#     After the PR is merged, pulls main, tags the merge commit with the
+#     version from Cargo.toml, and pushes the tag.
 #     The tag push triggers release.yml which publishes to crates.io.
 #
 # Prerequisites:
@@ -118,27 +119,42 @@ release:
     echo ""
     echo "    to push the tag and trigger the crates.io publish."
 
-# Step 2: push the local tag created by `just release`.
+# Step 2: tag main HEAD and push the tag.
 #
 # Run this after the release PR has been merged into main.
-# Pushes the annotated tag, which triggers release.yml and publishes
-# the crate to crates.io.
+# Pulls the latest main, reads the version from Cargo.toml, creates an
+# annotated tag on the current HEAD, and pushes it to trigger release.yml.
 push-tag:
     #!/usr/bin/env bash
     set -euo pipefail
 
-    # Find the most recent local tag that looks like a version tag.
-    tag=$(git describe --tags --abbrev=0 2>/dev/null || true)
-    if [[ -z "$tag" ]]; then
-        echo "error: no local version tag found; did you run 'just release'?" >&2
+    # Must be on main.
+    branch=$(git rev-parse --abbrev-ref HEAD)
+    if [[ "$branch" != "main" ]]; then
+        echo "error: push-tag must be run from main (currently on '$branch')" >&2
         exit 1
     fi
 
+    # Pull so we are at the merge commit.
+    echo "==> Pulling latest main..."
+    git pull --ff-only origin main
+
+    # Read the version from Cargo.toml.
+    version=$(grep -m1 '^version' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')
+    tag="v${version}"
+    echo "==> Tagging HEAD as ${tag}..."
+
     # Guard: tag must not already exist on origin.
-    if git ls-remote --tags origin "${tag}" | grep -q "${tag}"; then
+    if git ls-remote --tags origin "${tag}" | grep -q "refs/tags/${tag}$"; then
         echo "error: tag ${tag} already exists on origin" >&2
         exit 1
     fi
+
+    # Delete stale local tag if present (leftover from the release branch).
+    git tag -d "${tag}" 2>/dev/null || true
+
+    # Create a fresh annotated tag on the current (merged) HEAD.
+    git tag -a "${tag}" -m "chore(release): ${tag}"
 
     echo "==> Pushing tag ${tag}..."
     git push origin "${tag}"
