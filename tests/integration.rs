@@ -734,3 +734,25 @@ fn ser_non_string_map_key_is_an_error() {
         "expected error serializing char map key"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Regression tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn ser_empty_string_is_quoted() {
+    // Empty strings must be quoted so that `key = ` is never emitted —
+    // an unquoted empty value produces no token and fails to parse back.
+    #[derive(Serialize, Deserialize, PartialEq, Debug)]
+    struct Cfg {
+        val: String,
+    }
+    let original = Cfg { val: String::new() };
+    let s = to_string(&original).unwrap();
+    assert!(
+        s.contains("val = \"\""),
+        "expected quoted empty string, got: {s:?}"
+    );
+    let roundtripped: Cfg = from_str(&s).unwrap();
+    assert_eq!(original, roundtripped);
+}

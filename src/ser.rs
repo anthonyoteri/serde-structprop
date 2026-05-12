@@ -90,9 +90,13 @@ impl Serializer {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/// Wrap `s` in double quotes if it contains any structprop special characters
-/// (space, tab, newline, carriage return, `#`, `{`, `}`, or `=`); otherwise
-/// return it unchanged.
+/// Wrap `s` in double quotes if it is empty or contains any structprop special
+/// characters (space, tab, newline, carriage return, `#`, `{`, `}`, or `=`);
+/// otherwise return it unchanged.
+///
+/// Empty strings are always quoted so that they survive a round-trip: a bare
+/// empty value would produce `key = ` with no token after `=`, which the
+/// parser cannot recover from.
 ///
 /// The structprop format has no escape sequences. A `"` character can appear
 /// inside a *bare* (unquoted) term, but not inside a *quoted* term. Therefore,
@@ -100,8 +104,9 @@ impl Serializer {
 /// a literal `"` will serialize to syntactically ambiguous output. Such strings
 /// cannot round-trip through this format.
 fn escape(s: &str) -> String {
-    if s.chars()
-        .any(|c| matches!(c, ' ' | '\t' | '\n' | '\r' | '#' | '{' | '}' | '='))
+    if s.is_empty()
+        || s.chars()
+            .any(|c| matches!(c, ' ' | '\t' | '\n' | '\r' | '#' | '{' | '}' | '='))
     {
         format!("\"{s}\"")
     } else {
