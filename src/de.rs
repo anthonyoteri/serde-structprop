@@ -18,7 +18,8 @@
 //! | `key = { … }` | `Vec<T>` / tuple / tuple struct |
 //! | `key { … }` | struct / map |
 //! | bare variant name | unit enum variant |
-//! | `variant { … }` | newtype / tuple / struct enum variant |
+//! | `variant_name = <scalar or list>` | newtype / tuple enum variant |
+//! | `variant_name { … }` | struct enum variant |
 
 use crate::error::{Error, Result};
 use crate::parse::{parse, Value};

@@ -39,9 +39,9 @@ list = {
 }
 ```
 
-**Special characters** in values (spaces, tabs, newlines, `#`, `{`, `}`, `=`)
-must be wrapped in double quotes.  Empty strings are always quoted as `""`.
-Keys follow the same rule.
+**Special characters** in values (spaces, tabs, newlines, carriage returns,
+`#`, `{`, `}`, `=`) must be wrapped in double quotes.  Empty strings are
+always quoted as `""`.  Keys follow the same rule.
 
 ## Installation
 
@@ -52,9 +52,10 @@ Add to your `Cargo.toml`:
 serde-structprop = { version = "0.1", features = ["derive"] }
 ```
 
-The `derive` feature re-exports serde's derive macros so you can use
-`#[derive(Serialize, Deserialize)]` without a separate `serde` dependency.
-If you already depend on `serde` directly, you can omit the feature:
+The `derive` feature enables serde's own derive macros.  You still need a
+direct `serde` dependency in your crate so that `Serialize` and `Deserialize`
+are in scope.  If you already depend on `serde` with `features = ["derive"]`,
+you can omit the feature flag here:
 
 ```toml
 [dependencies]
@@ -79,7 +80,9 @@ serde-structprop = "0.1"
 | `Vec<T>` / sequence | `key = { … }` list |
 | tuple / tuple struct | `key = { … }` list of elements |
 | unit enum variant | bare variant name |
-| newtype / tuple / struct enum variant | `variant_name { … }` block |
+| newtype enum variant | `variant_name = <scalar or list>` |
+| tuple enum variant | `variant_name = { … }` list |
+| struct enum variant | `variant_name { … }` block |
 | raw bytes (`serialize_bytes` / `deserialize_bytes`) | **unsupported** — returns `Error::UnsupportedType` |
 
 ## Quick start
