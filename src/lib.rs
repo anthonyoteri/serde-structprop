@@ -50,8 +50,8 @@
 //!
 //! | Module | Contents |
 //! |---|---|
-//! | [`lexer`] | Tokenizer: converts raw text to [`lexer::Token`]s |
-//! | [`parse`] | Recursive-descent parser: produces a [`parse::Value`] tree |
+//! | [`lexer`] | Tokenizer: converts raw text to `Token`s |
+//! | [`mod@parse`] | Recursive-descent parser: produces a [`parse::Value`] tree |
 //! | [`de`] | `serde::Deserializer` implementation |
 //! | [`ser`] | `serde::Serializer` implementation |
 //! | [`error`] | [`Error`] type shared by all modules |

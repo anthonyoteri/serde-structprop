@@ -1,20 +1,20 @@
 //! Lexer (tokenizer) for the structprop format.
 //!
-//! The lexer converts a raw `&str` into a flat sequence of [`Token`]s, stripping
+//! The lexer converts a raw `&str` into a flat sequence of `Token`s, stripping
 //! comments and collapsing insignificant whitespace.  The resulting token stream
-//! is consumed by [`crate::parse`].
+//! is consumed by [`crate::parse()`].
 //!
 //! # Token rules
 //!
 //! | Input | Token produced |
 //! |---|---|
-//! | `=` | [`Token::Eq`] |
-//! | `{` | [`Token::Open`] |
-//! | `}` | [`Token::Close`] |
+//! | `=` | `Token::Eq` |
+//! | `{` | `Token::Open` |
+//! | `}` | `Token::Close` |
 //! | `# … \n` | *(discarded)* |
-//! | `"…"` | [`Token::Term`] with the quoted content |
-//! | any other non-whitespace run | [`Token::Term`] |
-//! | end of input | [`Token::Eof`] |
+//! | `"…"` | `Token::Term` with the quoted content |
+//! | any other non-whitespace run | `Token::Term` |
+//! | end of input | `Token::Eof` |
 
 /// A single token produced by the structprop lexer.
 #[derive(Debug, Clone, PartialEq, Eq)]

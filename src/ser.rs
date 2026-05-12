@@ -1,6 +1,6 @@
 //! Serde [`Serializer`](serde::Serializer) for the structprop format.
 //!
-//! The public entry point is [`to_string`].  Internally a [`Serializer`] walks
+//! The public entry point is [`to_string`].  Internally a `Serializer` walks
 //! the serde data model and writes structprop text directly into an output
 //! [`String`].
 //!
