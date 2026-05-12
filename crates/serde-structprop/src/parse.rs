@@ -98,6 +98,17 @@ fn peek(tokens: &[(Token, u32)], pos: usize) -> &Token {
     tokens.get(pos).map_or(&Token::Eof, |(tok, _)| tok)
 }
 
+/// Format a token as a human-readable string for error messages.
+fn token_display(tok: Option<&Token>) -> String {
+    match tok {
+        Some(Token::Term(s)) => format!("'{s}'"),
+        Some(Token::Eq) => "'='".to_owned(),
+        Some(Token::Open) => "'{{'".to_owned(),
+        Some(Token::Close) => "'}}'".to_owned(),
+        Some(Token::Eof) | None => "end of input".to_owned(),
+    }
+}
+
 /// Return the source line of the token at `pos`.
 fn line_at(tokens: &[(Token, u32)], pos: usize) -> u32 {
     tokens.get(pos).map_or(0, |&(_, line)| line)
@@ -125,7 +136,8 @@ fn expect_term(tokens: &[(Token, u32)], pos: &mut usize) -> Result<String> {
         other => {
             let tok = other.map(|(t, _)| t);
             Err(Error::Parse(format!(
-                "line {line}: expected term, got {tok:?}"
+                "line {line}: expected a key or value, got {}",
+                token_display(tok)
             )))
         }
     }
@@ -190,14 +202,16 @@ fn parse_object(
                     }
                     other => {
                         return Err(Error::Parse(format!(
-                            "line {after_line}: expected '=' or '{{' after key '{key}', got {other:?}"
+                            "line {after_line}: expected '=' or '{{' after key '{key}', got {}",
+                            token_display(Some(other))
                         )));
                     }
                 }
             }
             other => {
                 return Err(Error::Parse(format!(
-                    "line {line}: unexpected token {other:?}"
+                    "line {line}: unexpected {}",
+                    token_display(Some(other))
                 )));
             }
         }
@@ -223,7 +237,8 @@ fn parse_value(tokens: &[(Token, u32)], pos: &mut usize) -> Result<Value> {
             Ok(Value::Scalar(s))
         }
         other => Err(Error::Parse(format!(
-            "line {line}: expected value, got {other:?}"
+            "line {line}: expected a value, got {}",
+            token_display(Some(other))
         ))),
     }
 }
@@ -260,12 +275,26 @@ fn parse_array_or_object_list(tokens: &[(Token, u32)], pos: &mut usize) -> Resul
                 items.push(Value::Object(sub));
             }
             Token::Term(_) => {
+                // Peek ahead: `term =` inside an array means the caller wrote
+                // a key-value assignment directly in a list body, which is not
+                // valid.  Catch it here so we can name the key and suggest the
+                // correct syntax before consuming the term.
+                if matches!(tokens.get(*pos + 1), Some((Token::Eq, _))) {
+                    let key = match tokens.get(*pos) {
+                        Some((Token::Term(s), _)) => s.clone(),
+                        _ => "?".to_owned(),
+                    };
+                    return Err(Error::Parse(format!(
+                        "line {line}: '{key} = ...' is not valid inside an array; \
+                         wrap it in braces for a nested object: '{{ {key} = ... }}'"
+                    )));
+                }
                 let s = expect_term(tokens, pos)?;
                 items.push(Value::Scalar(s));
             }
-            other @ Token::Eq => {
+            Token::Eq => {
                 return Err(Error::Parse(format!(
-                    "line {line}: unexpected token in array: {other:?}"
+                    "line {line}: unexpected '=' inside array"
                 )));
             }
         }
@@ -419,6 +448,33 @@ mod tests {
         assert!(
             err.contains("line "),
             "expected a line number in error: {err}"
+        );
+    }
+
+    #[test]
+    fn kv_inside_array_suggests_fix() {
+        // `subkey = nested` inside an array body is the most common mistake;
+        // the error should name the key and tell the user how to fix it.
+        let input = "list = {\n  subkey = nested\n}\n";
+        let err = parse(input).unwrap_err().to_string();
+        assert!(
+            err.contains("'subkey = ...' is not valid inside an array"),
+            "expected actionable hint in error: {err}"
+        );
+        assert!(
+            err.contains("{ subkey = ... }"),
+            "expected brace-wrap hint in error: {err}"
+        );
+    }
+
+    #[test]
+    fn token_display_uses_human_readable_names() {
+        // A leading `=` with no preceding key should say `'='`, not `Eq`.
+        let input = "= value\n";
+        let err = parse(input).unwrap_err().to_string();
+        assert!(
+            err.contains("'='") || err.contains("end of input"),
+            "error should use human-readable token names: {err}"
         );
     }
 }
