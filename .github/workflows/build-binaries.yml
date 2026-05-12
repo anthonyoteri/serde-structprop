@@ -16,7 +16,7 @@ env:
 
 jobs:
   build-binaries:
-    name: Build binary (${{ matrix.asset_name }})
+    name: Build binary (${{ matrix.upload_name }})
     runs-on: ${{ matrix.os }}
     permissions:
       contents: write
