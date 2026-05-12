@@ -48,9 +48,10 @@ jobs:
         run: |
           # Extract the version from the tag (strip leading 'v').
           VERSION="${GITHUB_REF_NAME#v}"
-          # Generate the changelog section for this version only.
-          cog changelog --at "$GITHUB_REF_NAME" > release_notes.md || \
-            echo "No structured changelog available for $GITHUB_REF_NAME." > release_notes.md
+          # Write release notes outside the repo so cargo publish --locked
+          # does not see an untracked file and refuse to run.
+          cog changelog --at "$GITHUB_REF_NAME" > /tmp/release_notes.md || \
+            echo "No structured changelog available for $GITHUB_REF_NAME." > /tmp/release_notes.md
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Publish to crates.io
@@ -62,6 +63,6 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" \
             --title "$GITHUB_REF_NAME" \
-            --notes-file release_notes.md
+            --notes-file /tmp/release_notes.md
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
