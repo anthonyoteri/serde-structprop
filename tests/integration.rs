@@ -573,12 +573,9 @@ fn ser_char_special_chars_are_quoted() {
 // Cycle 5: duplicate keys must produce an error, not silently overwrite
 #[test]
 fn de_duplicate_key_is_an_error() {
-    #[derive(Debug, Deserialize)]
-    struct S {
-        _port: u32,
-    }
+    use std::collections::HashMap;
     let input = "port = 1234\nport = 5678\n";
-    let result: Result<S, _> = from_str(input);
+    let result: Result<HashMap<String, String>, _> = from_str(input);
     assert!(
         result.is_err(),
         "expected error for duplicate key, got {result:?}"
@@ -588,12 +585,9 @@ fn de_duplicate_key_is_an_error() {
 // Cycle 6: unterminated quoted string must produce an error, not silently drop content
 #[test]
 fn de_unterminated_quoted_string_is_an_error() {
-    #[derive(Debug, Deserialize)]
-    struct S {
-        _key: String,
-    }
+    use std::collections::HashMap;
     let input = "key = \"unterminated";
-    let result: Result<S, _> = from_str(input);
+    let result: Result<HashMap<String, String>, _> = from_str(input);
     assert!(
         result.is_err(),
         "expected error for unterminated string, got {result:?}"

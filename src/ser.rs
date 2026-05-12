@@ -415,14 +415,21 @@ impl MapSerializer<'_> {
         let indent = self.ser.indent;
         let pad = " ".repeat(indent);
 
-        // Probe the value type by rendering at indent=0 into a throwaway buffer.
-        // We only use this to decide which syntactic form to emit; the actual
-        // content is then (re-)serialized at the correct indentation so we never
-        // blindly re-indent individual lines (which would corrupt quoted strings
-        // that contain embedded newlines).
-        let mut probe = Serializer::new(0);
-        value.serialize(&mut probe)?;
-        let rendered = probe.output;
+        // Serialize the value at the *current* indentation level.  This single
+        // call is sufficient for scalars and for array blocks, whose output is
+        // already formatted correctly:
+        //
+        //   scalar  →  no newlines, used directly as the RHS of `key = value`
+        //   array   →  `{\n<items at indent+2>\n<indent>}\n`, written inline
+        //               as `key = {…}` by `writeln!` below
+        //
+        // Only struct/map (multi-line, not starting with `{` or `"`) needs the
+        // content indented two levels deeper than the current key, so we
+        // re-serialize those at `indent+2`.  This is the only case where
+        // `Serialize` is invoked twice.
+        let mut first = Serializer::new(indent);
+        value.serialize(&mut first)?;
+        let rendered = first.output;
 
         if rendered.contains('\n')
             && !rendered.trim_start().starts_with('{')
@@ -430,8 +437,10 @@ impl MapSerializer<'_> {
         {
             // Multi-line object block → `key {\n  <fields at indent+2>\n}\n`
             // Re-serialize at the correct child indentation so nested fields
-            // and their values are placed correctly without manual line-by-line
-            // re-indenting (which would corrupt quoted strings with newlines).
+            // sit two levels deeper than the enclosing key.  We must not
+            // blindly re-indent the first-pass output line-by-line because
+            // doing so would corrupt any quoted scalar whose value contains a
+            // literal newline (the continuation line is not a separate field).
             writeln!(self.ser.output, "{pad}{} {{", escape(key))
                 .map_err(|e| Error::Message(e.to_string()))?;
             let mut inner = Serializer::new(indent + 2);
@@ -440,15 +449,14 @@ impl MapSerializer<'_> {
             writeln!(self.ser.output, "{pad}}}").map_err(|e| Error::Message(e.to_string()))?;
         } else if rendered.contains('\n') {
             // Multi-line array block starting with `{`.
-            // Re-serialize at the current indentation so item lines and the
-            // closing `}` are placed at `indent+2` / `indent` respectively.
-            let mut inner = Serializer::new(indent);
-            value.serialize(&mut inner)?;
+            // The first-pass output is already at the right indentation
+            // (`{` inline, items at `indent+2`, `}` at `indent`), so we
+            // reuse it without a second `serialize` call.
             writeln!(
                 self.ser.output,
                 "{pad}{} = {}",
                 escape(key),
-                inner.output.trim_end()
+                rendered.trim_end()
             )
             .map_err(|e| Error::Message(e.to_string()))?;
         } else {
