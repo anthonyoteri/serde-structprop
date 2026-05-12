@@ -1,6 +1,6 @@
 [package]
 name = "structprop-validator"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 rust-version = "1.85"
 authors = ["Anthony Oteri <anthony.oteri@gmail.com>"]
@@ -18,5 +18,5 @@ name = "structprop-validator"
 path = "src/main.rs"
 
 [dependencies]
-serde-structprop = { path = "../serde-structprop", version = "0.2.0" }
+serde-structprop = { path = "../serde-structprop", version = "0.2.1" }
 anyhow = "1"
