@@ -444,8 +444,13 @@ impl MapSerializer<'_> {
             // closing `}` are placed at `indent+2` / `indent` respectively.
             let mut inner = Serializer::new(indent);
             value.serialize(&mut inner)?;
-            writeln!(self.ser.output, "{pad}{} = {}", escape(key), inner.output.trim_end())
-                .map_err(|e| Error::Message(e.to_string()))?;
+            writeln!(
+                self.ser.output,
+                "{pad}{} = {}",
+                escape(key),
+                inner.output.trim_end()
+            )
+            .map_err(|e| Error::Message(e.to_string()))?;
         } else {
             // Scalar (no newlines, or a quoted scalar — both fit on one line).
             let rendered = rendered.trim_end_matches('\n');
