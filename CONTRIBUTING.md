@@ -96,25 +96,32 @@ cog check
 Releases are managed by maintainers.  The easiest path is the `just release`
 recipe, which runs all pre-flight checks and then automates every step:
 
+Releases use a two-step process to work with branch protection on `main`:
+
+**Step 1** — open a release PR:
+
 ```
 just release
 ```
 
 This will:
-1. Verify you are on `main`, the tree is clean, and local `main` is not behind `origin/main`.
+1. Verify you are on `main`, the tree is clean, and not behind `origin/main`.
 2. Run `cargo test`, `cargo fmt --check`, and `cargo clippy`.
-3. Run `cog bump --auto` to determine the next semver version from the commit
-   history, update `Cargo.toml`, generate `CHANGELOG.md`, and create a commit
-   and annotated tag.
-4. Push the bump commit and tag — the tag push triggers the CI release workflow,
-   which publishes to crates.io and creates a GitHub release.
+3. Determine the next semver version from the commit history using `cog bump --auto --dry-run`.
+4. Create a `release/vX.Y.Z` branch, run `cog bump --auto` on it (updates `Cargo.toml`,
+   generates `CHANGELOG.md`, commits, and creates the annotated tag **locally**).
+5. Push the branch and open a pull request against `main`.
 
-If you prefer to run the steps manually:
+Review the PR (check the generated `CHANGELOG.md` and version bump), then merge it normally.
+
+**Step 2** — publish by pushing the tag:
 
 ```
-cog bump --auto          # bump version, write CHANGELOG.md, commit, tag
-git push origin main --follow-tags   # trigger the release workflow
+just push-tag
 ```
+
+Run this after the PR is merged. It pushes the local tag created in step 1, which
+triggers the CI release workflow that publishes to crates.io and creates the GitHub release.
 
 Breaking changes (anything that changes the public API) require a
 `BREAKING CHANGE:` footer in the commit body so that `cog bump` can correctly
