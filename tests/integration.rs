@@ -444,3 +444,251 @@ fn ser_object_order_is_kept() {
         "got: {out:?}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Bug fix tests
+// ---------------------------------------------------------------------------
+
+// Cycle 1: serialize_struct_variant must not corrupt output via insert_str(0)
+#[test]
+fn ser_struct_variant_does_not_corrupt_preceding_fields() {
+    #[derive(Serialize)]
+    enum Shape {
+        Circle { radius: u32 },
+    }
+    #[derive(Serialize)]
+    struct Config {
+        name: String,
+        shape: Shape,
+    }
+    let cfg = Config {
+        name: "test".into(),
+        shape: Shape::Circle { radius: 5 },
+    };
+    let out = to_string(&cfg).unwrap();
+    // "name" must appear before "Circle" — insert_str(0) bug put the variant
+    // header at position 0, before any previously-written fields.
+    let pos_name = out.find("name").expect("missing 'name'");
+    let pos_circle = out.find("Circle").expect("missing 'Circle'");
+    assert!(
+        pos_name < pos_circle,
+        "'name' should appear before 'Circle', got:\n{out}"
+    );
+}
+
+// Cycle 2: tuple variant with zero elements must not panic
+#[test]
+fn ser_tuple_variant_zero_elements_does_not_panic() {
+    #[derive(Serialize)]
+    enum E {
+        Empty(),
+    }
+    // Must not panic — previously items.remove(0) panicked on empty vec.
+    let result = to_string(&E::Empty());
+    assert!(result.is_ok(), "expected Ok, got {result:?}");
+}
+
+// Cycle 2b: tuple variant sentinel collision — variant named "__variant__Foo"
+#[test]
+fn ser_tuple_variant_sentinel_collision() {
+    #[derive(Serialize, Deserialize, PartialEq, Debug)]
+    enum E {
+        #[serde(rename = "__variant__Tricky")]
+        Tricky(u32),
+    }
+    let out = to_string(&E::Tricky(42)).unwrap();
+    // The variant name in the output must be the full "__variant__Tricky",
+    // not just "Tricky" (which would happen if sentinel stripping ate the prefix).
+    assert!(
+        out.contains("__variant__Tricky"),
+        "variant name mangled, got:\n{out}"
+    );
+}
+
+// Cycle 3: escape() must quote strings containing newlines
+#[test]
+fn ser_string_with_newline_is_quoted() {
+    #[derive(Serialize, Deserialize, PartialEq, Debug)]
+    struct S {
+        msg: String,
+    }
+    let s = S {
+        msg: "hello\nworld".into(),
+    };
+    let out = to_string(&s).unwrap();
+    // A bare newline in the output would break the line-oriented parser.
+    // The value must be wrapped in quotes.
+    assert!(
+        out.contains('"'),
+        "expected quoted output for newline-containing string, got:\n{out}"
+    );
+    // And it must round-trip.
+    let back: S = from_str(&out).unwrap();
+    assert_eq!(back, s);
+}
+
+// Nested struct containing a string with a newline must round-trip correctly.
+// Regression for write_kv re-indent bug: blindly prefixing every line with
+// spaces would corrupt the continuation lines of a quoted multi-line scalar.
+#[test]
+fn roundtrip_nested_struct_with_newline_string() {
+    #[derive(Serialize, Deserialize, PartialEq, Debug)]
+    struct Inner {
+        msg: String,
+    }
+    #[derive(Serialize, Deserialize, PartialEq, Debug)]
+    struct Outer {
+        name: String,
+        inner: Inner,
+    }
+    let orig = Outer {
+        name: "test".into(),
+        inner: Inner {
+            msg: "hello\nworld".into(),
+        },
+    };
+    let out = to_string(&orig).unwrap();
+    let back: Outer = from_str(&out).unwrap();
+    assert_eq!(back, orig, "round-trip failed; output was:\n{out}");
+}
+
+// Cycle 4: serialize_char must quote structprop special characters
+#[test]
+fn ser_char_special_chars_are_quoted() {
+    #[derive(Serialize, Deserialize, PartialEq, Debug)]
+    struct S {
+        c: char,
+    }
+    for special in [' ', '#', '{', '}', '='] {
+        let s = S { c: special };
+        let out = to_string(&s).unwrap();
+        let back: S = from_str(&out).unwrap();
+        assert_eq!(
+            back, s,
+            "char '{special}' did not round-trip; output was:\n{out}"
+        );
+    }
+}
+
+// Cycle 5: duplicate keys must produce an error, not silently overwrite
+#[test]
+fn de_duplicate_key_is_an_error() {
+    use std::collections::HashMap;
+    let input = "port = 1234\nport = 5678\n";
+    let result: Result<HashMap<String, String>, _> = from_str(input);
+    assert!(
+        result.is_err(),
+        "expected error for duplicate key, got {result:?}"
+    );
+}
+
+// Cycle 6: unterminated quoted string must produce an error, not silently drop content
+#[test]
+fn de_unterminated_quoted_string_is_an_error() {
+    use std::collections::HashMap;
+    let input = "key = \"unterminated";
+    let result: Result<HashMap<String, String>, _> = from_str(input);
+    assert!(
+        result.is_err(),
+        "expected error for unterminated string, got {result:?}"
+    );
+}
+
+// Cycle 7: large integer (> i64::MAX) must not silently become a float
+#[test]
+fn de_large_integer_is_not_silently_coerced_to_float() {
+    // u64::MAX cannot be represented as i64; previously deserialize_any would
+    // fall through i64 parse failure → f64 parse, silently losing precision.
+    #[derive(Debug, Deserialize)]
+    struct S {
+        val: u64,
+    }
+    let input = format!("val = {}\n", u64::MAX);
+    let s: S = from_str(&input).unwrap();
+    assert_eq!(s.val, u64::MAX);
+}
+
+// Cycle 8: enum round-trips — unit, newtype, tuple, struct variants
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+enum Color {
+    Red,
+    Green,
+    Blue,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+enum Message {
+    Quit,
+    Move { x: i32, y: i32 },
+    Write(String),
+    ChangeColor(u8, u8, u8),
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+struct WithEnum {
+    color: Color,
+}
+
+#[test]
+fn roundtrip_unit_enum_variant() {
+    let s = WithEnum { color: Color::Red };
+    let out = to_string(&s).unwrap();
+    let back: WithEnum = from_str(&out).unwrap();
+    assert_eq!(back, s);
+}
+
+#[test]
+fn roundtrip_newtype_enum_variant() {
+    let msg = Message::Write("hello".into());
+    let out = to_string(&msg).unwrap();
+    let back: Message = from_str(&out).unwrap();
+    assert_eq!(back, msg);
+}
+
+#[test]
+fn roundtrip_struct_enum_variant() {
+    let msg = Message::Move { x: 10, y: 20 };
+    let out = to_string(&msg).unwrap();
+    let back: Message = from_str(&out).unwrap();
+    assert_eq!(back, msg);
+}
+
+#[test]
+fn roundtrip_tuple_enum_variant() {
+    let msg = Message::ChangeColor(255, 128, 0);
+    let out = to_string(&msg).unwrap();
+    let back: Message = from_str(&out).unwrap();
+    assert_eq!(back, msg);
+}
+
+// Cycle 9: Option::None round-trip
+#[test]
+fn roundtrip_option_none() {
+    #[derive(Serialize, Deserialize, PartialEq, Debug)]
+    struct S {
+        #[serde(default)]
+        value: Option<u32>,
+    }
+    // None serializes to `null`; must deserialize back to None.
+    let s = S { value: None };
+    let out = to_string(&s).unwrap();
+    assert!(
+        out.contains("null"),
+        "expected 'null' in output, got:\n{out}"
+    );
+    let back: S = from_str(&out).unwrap();
+    assert_eq!(back, s);
+}
+
+// Option field absent from document should deserialize as None via serde default
+#[test]
+fn de_option_field_absent_defaults_to_none() {
+    #[derive(Deserialize, PartialEq, Debug)]
+    struct S {
+        name: String,
+        #[serde(default)]
+        count: Option<u32>,
+    }
+    let s: S = from_str("name = foo\n").unwrap();
+    assert_eq!(s.count, None);
+}

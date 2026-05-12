@@ -154,11 +154,17 @@ fn parse_object(
                     Token::Eq => {
                         advance(pos); // consume '='
                         let val = parse_value(tokens, pos)?;
+                        if map.contains_key(&key) {
+                            return Err(Error::Parse(format!("duplicate key '{key}'")));
+                        }
                         map.insert(key, val);
                     }
                     Token::Open => {
                         advance(pos); // consume '{'
                         let sub = parse_object(tokens, pos, /*top_level=*/ false)?;
+                        if map.contains_key(&key) {
+                            return Err(Error::Parse(format!("duplicate key '{key}'")));
+                        }
                         map.insert(key, Value::Object(sub));
                     }
                     other => {

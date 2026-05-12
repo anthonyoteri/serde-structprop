@@ -91,10 +91,17 @@ impl Serializer {
 // ---------------------------------------------------------------------------
 
 /// Wrap `s` in double quotes if it contains any structprop special characters
-/// (space, tab, `#`, `{`, `}`, or `=`); otherwise return it unchanged.
+/// (space, tab, newline, carriage return, `#`, `{`, `}`, or `=`); otherwise
+/// return it unchanged.
+///
+/// The structprop format has no escape sequences. A `"` character can appear
+/// inside a *bare* (unquoted) term, but not inside a *quoted* term. Therefore,
+/// strings that both require quoting (contain a special character) and contain
+/// a literal `"` will serialize to syntactically ambiguous output. Such strings
+/// cannot round-trip through this format.
 fn escape(s: &str) -> String {
     if s.chars()
-        .any(|c| matches!(c, ' ' | '\t' | '#' | '{' | '}' | '='))
+        .any(|c| matches!(c, ' ' | '\t' | '\n' | '\r' | '#' | '{' | '}' | '='))
     {
         format!("\"{s}\"")
     } else {
@@ -171,7 +178,8 @@ impl<'a> ser::Serializer for &'a mut Serializer {
     }
 
     fn serialize_char(self, v: char) -> Result<()> {
-        self.output.push(v);
+        // Route through escape() so special characters are quoted.
+        self.output.push_str(&escape(&v.to_string()));
         Ok(())
     }
 
@@ -226,23 +234,22 @@ impl<'a> ser::Serializer for &'a mut Serializer {
         variant: &'static str,
         value: &T,
     ) -> Result<()> {
-        // Encode as: `variant_name {\n  <payload>\n}\n`
-        let pad = self.pad();
-        writeln!(self.output, "{pad}{} {{", escape(variant))
-            .map_err(|e| Error::Message(e.to_string()))?;
-        // Render at indent=0; re-indent each line by pad+2 below.
-        let mut inner = Serializer::new(0);
-        value.serialize(&mut inner)?;
-        for line in inner.output.lines() {
-            writeln!(self.output, "{pad}  {line}").map_err(|e| Error::Message(e.to_string()))?;
-        }
-        writeln!(self.output, "{pad}}}").map_err(|e| Error::Message(e.to_string()))
+        // Encode as `variant = <payload>` (scalar) or `variant { … }` (object block)
+        // so the parser produces Object({"variant": payload}), which is exactly what
+        // deserialize_enum expects for newtype variants.
+        let mut ms = MapSerializer {
+            ser: self,
+            current_key: None,
+            variant_name: None,
+        };
+        ms.write_kv(variant, value)
     }
 
     fn serialize_seq(self, _len: Option<usize>) -> Result<Self::SerializeSeq> {
         Ok(SeqSerializer {
             parent: self,
             items: Vec::new(),
+            variant: None,
         })
     }
 
@@ -265,11 +272,10 @@ impl<'a> ser::Serializer for &'a mut Serializer {
         variant: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeTupleVariant> {
-        // Store the variant name in a sentinel as the first "item" so that
-        // `SerializeTupleVariant::end` can emit the wrapping block.
         Ok(SeqSerializer {
             parent: self,
-            items: vec![format!("__variant__{variant}")],
+            items: Vec::new(),
+            variant: Some(variant.to_owned()),
         })
     }
 
@@ -310,6 +316,8 @@ pub struct SeqSerializer<'a> {
     parent: &'a mut Serializer,
     /// Each element serialized to a string, accumulated for deferred emission.
     items: Vec<String>,
+    /// Set for tuple variants: the variant name to wrap the array under.
+    variant: Option<String>,
 }
 
 impl ser::SerializeSeq for SeqSerializer<'_> {
@@ -370,14 +378,16 @@ impl ser::SerializeTupleVariant for SeqSerializer<'_> {
     }
 
     fn end(self) -> Result<()> {
-        // The first "item" is the sentinel carrying the variant name.
-        let mut items = self.items;
-        let variant = items.remove(0).trim_start_matches("__variant__").to_owned();
+        // Emit as `variant = { item1\n  item2\n … }` so the parser produces
+        // Object({"variant": Array([…])}), matching what deserialize_enum expects.
+        let variant = self.variant.ok_or_else(|| {
+            Error::Message("variant name missing in SerializeTupleVariant::end".into())
+        })?;
         let pad = self.parent.pad();
         let inner_pad = " ".repeat(self.parent.indent + 2);
-        writeln!(self.parent.output, "{pad}{} {{", escape(&variant))
+        writeln!(self.parent.output, "{pad}{} = {{", escape(&variant))
             .map_err(|e| Error::Message(e.to_string()))?;
-        for item in &items {
+        for item in &self.items {
             writeln!(self.parent.output, "{inner_pad}{item}")
                 .map_err(|e| Error::Message(e.to_string()))?;
         }
@@ -405,35 +415,52 @@ impl MapSerializer<'_> {
         let indent = self.ser.indent;
         let pad = " ".repeat(indent);
 
-        // Render at indent=0 so SeqSerializer / MapSerializer do not add their
-        // own base indentation; we re-apply `pad` below.
-        let mut inner = Serializer::new(0);
-        value.serialize(&mut inner)?;
-        let rendered = inner.output;
+        // Serialize the value at the *current* indentation level.  This single
+        // call is sufficient for scalars and for array blocks, whose output is
+        // already formatted correctly:
+        //
+        //   scalar  →  no newlines, used directly as the RHS of `key = value`
+        //   array   →  `{\n<items at indent+2>\n<indent>}\n`, written inline
+        //               as `key = {…}` by `writeln!` below
+        //
+        // Only struct/map (multi-line, not starting with `{` or `"`) needs the
+        // content indented two levels deeper than the current key, so we
+        // re-serialize those at `indent+2`.  This is the only case where
+        // `Serialize` is invoked twice.
+        let mut first = Serializer::new(indent);
+        value.serialize(&mut first)?;
+        let rendered = first.output;
 
-        if rendered.contains('\n') && !rendered.trim_start().starts_with('{') {
-            // Multi-line object block → `key {\n  …lines re-indented…\n}\n`
+        if rendered.contains('\n')
+            && !rendered.trim_start().starts_with('{')
+            && !rendered.trim_start().starts_with('"')
+        {
+            // Multi-line object block → `key {\n  <fields at indent+2>\n}\n`
+            // Re-serialize at the correct child indentation so nested fields
+            // sit two levels deeper than the enclosing key.  We must not
+            // blindly re-indent the first-pass output line-by-line because
+            // doing so would corrupt any quoted scalar whose value contains a
+            // literal newline (the continuation line is not a separate field).
             writeln!(self.ser.output, "{pad}{} {{", escape(key))
                 .map_err(|e| Error::Message(e.to_string()))?;
-            for line in rendered.lines() {
-                writeln!(self.ser.output, "{pad}  {line}")
-                    .map_err(|e| Error::Message(e.to_string()))?;
-            }
+            let mut inner = Serializer::new(indent + 2);
+            value.serialize(&mut inner)?;
+            self.ser.output.push_str(&inner.output);
             writeln!(self.ser.output, "{pad}}}").map_err(|e| Error::Message(e.to_string()))?;
         } else if rendered.contains('\n') {
             // Multi-line array block starting with `{`.
-            // First line (`{`) goes inline with `key = `; remaining lines get
-            // `pad` prepended so items sit at `indent+2` and `}` at `indent`.
-            let mut lines = rendered.lines();
-            let first = lines.next().unwrap_or("{");
-            writeln!(self.ser.output, "{pad}{} = {first}", escape(key))
-                .map_err(|e| Error::Message(e.to_string()))?;
-            for line in lines {
-                writeln!(self.ser.output, "{pad}{line}")
-                    .map_err(|e| Error::Message(e.to_string()))?;
-            }
+            // The first-pass output is already at the right indentation
+            // (`{` inline, items at `indent+2`, `}` at `indent`), so we
+            // reuse it without a second `serialize` call.
+            writeln!(
+                self.ser.output,
+                "{pad}{} = {}",
+                escape(key),
+                rendered.trim_end()
+            )
+            .map_err(|e| Error::Message(e.to_string()))?;
         } else {
-            // Scalar (no newlines at all).
+            // Scalar (no newlines, or a quoted scalar — both fit on one line).
             let rendered = rendered.trim_end_matches('\n');
             writeln!(self.ser.output, "{pad}{} = {rendered}", escape(key))
                 .map_err(|e| Error::Message(e.to_string()))?;
