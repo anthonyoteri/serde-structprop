@@ -706,7 +706,10 @@ fn de_unit_field_roundtrip() {
 
     // Any non-null scalar must be rejected when the target type is unit.
     let err: Result<Doc, _> = from_str("key = hello\n");
-    assert!(err.is_err(), "expected error deserializing non-null as unit");
+    assert!(
+        err.is_err(),
+        "expected error deserializing non-null as unit"
+    );
 }
 
 // serialize_key must return KeyMustBeString for integer keys
@@ -716,5 +719,8 @@ fn ser_non_string_map_key_is_an_error() {
     let mut map = HashMap::new();
     map.insert(42u32, "hello");
     let result = to_string(&map);
-    assert!(result.is_err(), "expected error serializing integer map key");
+    assert!(
+        result.is_err(),
+        "expected error serializing integer map key"
+    );
 }
