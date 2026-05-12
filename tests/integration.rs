@@ -1,3 +1,7 @@
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+
+use url::Url;
+
 use serde::{Deserialize, Serialize};
 use serde_structprop::{from_str, to_string};
 
@@ -755,4 +759,356 @@ fn ser_empty_string_is_quoted() {
     );
     let roundtripped: Cfg = from_str(&s).unwrap();
     assert_eq!(original, roundtripped);
+}
+
+// ---------------------------------------------------------------------------
+// Rich-type deserialization tests (std::net — no extra dependency required)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn de_ipv4_addr() {
+    #[derive(Deserialize)]
+    struct Cfg {
+        addr: Ipv4Addr,
+    }
+    let cfg: Cfg = from_str("addr = 10.0.0.1\n").unwrap();
+    assert_eq!(cfg.addr, Ipv4Addr::new(10, 0, 0, 1));
+}
+
+#[test]
+fn de_ipv6_addr() {
+    #[derive(Deserialize)]
+    struct Cfg {
+        addr: Ipv6Addr,
+    }
+    let cfg: Cfg = from_str("addr = \"::1\"\n").unwrap();
+    assert_eq!(cfg.addr, Ipv6Addr::LOCALHOST);
+}
+
+#[test]
+fn de_ip_addr_v4() {
+    #[derive(Deserialize)]
+    struct Cfg {
+        addr: IpAddr,
+    }
+    let cfg: Cfg = from_str("addr = 192.168.1.1\n").unwrap();
+    assert_eq!(cfg.addr, IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)));
+}
+
+#[test]
+fn de_ip_addr_v6() {
+    #[derive(Deserialize)]
+    struct Cfg {
+        addr: IpAddr,
+    }
+    let cfg: Cfg = from_str("addr = \"::1\"\n").unwrap();
+    assert_eq!(cfg.addr, IpAddr::V6(Ipv6Addr::LOCALHOST));
+}
+
+#[test]
+fn de_vec_of_ip_addrs() {
+    #[derive(Deserialize)]
+    struct Cfg {
+        addrs: Vec<IpAddr>,
+    }
+    let cfg: Cfg = from_str("addrs = { 10.0.0.1 10.0.0.2 }\n").unwrap();
+    assert_eq!(
+        cfg.addrs,
+        vec![
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2)),
+        ]
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Rich-type deserialization tests (url::Url)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn de_url_field() {
+    #[derive(Deserialize)]
+    struct Cfg {
+        endpoint: Url,
+    }
+    let cfg: Cfg = from_str("endpoint = \"http://example.com/foo\"\n").unwrap();
+    assert_eq!(cfg.endpoint.as_str(), "http://example.com/foo");
+}
+
+#[test]
+fn de_url_bare_no_path() {
+    #[derive(Deserialize)]
+    struct Cfg {
+        endpoint: Url,
+    }
+    // URLs without spaces or structprop special chars lex as a single bare term.
+    let cfg: Cfg = from_str("endpoint = http://example.com\n").unwrap();
+    assert_eq!(cfg.endpoint.host_str(), Some("example.com"));
+}
+
+#[test]
+fn de_url_invalid_is_error() {
+    #[derive(Deserialize)]
+    struct Cfg {
+        _endpoint: Url,
+    }
+    assert!(from_str::<Cfg>("endpoint = not-a-url\n").is_err());
+}
+
+#[test]
+fn de_vec_of_urls() {
+    #[derive(Deserialize)]
+    struct Cfg {
+        endpoints: Vec<Url>,
+    }
+    let cfg: Cfg =
+        from_str("endpoints = { \"http://foo.example.com\" \"http://bar.example.com\" }\n")
+            .unwrap();
+    assert_eq!(cfg.endpoints[0].host_str(), Some("foo.example.com"));
+    assert_eq!(cfg.endpoints[1].host_str(), Some("bar.example.com"));
+}
+
+// ---------------------------------------------------------------------------
+// char and bool edge cases
+// ---------------------------------------------------------------------------
+
+#[test]
+fn de_char_field() {
+    #[derive(Deserialize)]
+    struct Cfg {
+        sep: char,
+    }
+    let cfg: Cfg = from_str("sep = ,\n").unwrap();
+    assert_eq!(cfg.sep, ',');
+}
+
+#[test]
+fn roundtrip_char() {
+    #[derive(Serialize, Deserialize, PartialEq, Debug)]
+    struct Cfg {
+        sep: char,
+    }
+    let original = Cfg { sep: ',' };
+    let s = to_string(&original).unwrap();
+    let roundtripped: Cfg = from_str(&s).unwrap();
+    assert_eq!(original, roundtripped);
+}
+
+#[test]
+fn de_char_multichar_is_error() {
+    #[derive(Deserialize)]
+    struct Cfg {
+        _sep: char,
+    }
+    assert!(from_str::<Cfg>("sep = ab\n").is_err());
+}
+
+#[test]
+fn roundtrip_bool() {
+    #[derive(Serialize, Deserialize, PartialEq, Debug)]
+    struct Cfg {
+        enabled: bool,
+    }
+    for val in [true, false] {
+        let original = Cfg { enabled: val };
+        let s = to_string(&original).unwrap();
+        let roundtripped: Cfg = from_str(&s).unwrap();
+        assert_eq!(original, roundtripped);
+    }
+}
+
+#[test]
+fn de_bool_invalid_is_error() {
+    #[derive(Deserialize)]
+    struct Cfg {
+        _enabled: bool,
+    }
+    assert!(from_str::<Cfg>("enabled = yes\n").is_err());
+}
+
+#[test]
+fn de_u8_out_of_range_is_error() {
+    #[derive(Deserialize)]
+    struct Cfg {
+        _val: u8,
+    }
+    assert!(from_str::<Cfg>("val = 300\n").is_err());
+}
+
+#[test]
+fn de_u64_negative_is_error() {
+    #[derive(Deserialize)]
+    struct Cfg {
+        _val: u64,
+    }
+    assert!(from_str::<Cfg>("val = -1\n").is_err());
+}
+
+#[test]
+fn de_float_field() {
+    #[derive(Deserialize)]
+    struct Cfg {
+        ratio: f64,
+    }
+    let cfg: Cfg = from_str("ratio = 1.5\n").unwrap();
+    assert!((cfg.ratio - 1.5_f64).abs() < f64::EPSILON);
+}
+
+// ---------------------------------------------------------------------------
+// Floats
+// ---------------------------------------------------------------------------
+
+#[test]
+fn roundtrip_f32() {
+    #[derive(Serialize, Deserialize, PartialEq, Debug)]
+    struct Cfg {
+        ratio: f32,
+    }
+    let original = Cfg { ratio: 1.5 };
+    let s = to_string(&original).unwrap();
+    let roundtripped: Cfg = from_str(&s).unwrap();
+    assert!((original.ratio - roundtripped.ratio).abs() < f32::EPSILON);
+}
+
+#[test]
+fn roundtrip_f64() {
+    #[derive(Serialize, Deserialize, PartialEq, Debug)]
+    struct Cfg {
+        ratio: f64,
+    }
+    let original = Cfg {
+        ratio: 1.234_567_89,
+    };
+    let s = to_string(&original).unwrap();
+    let roundtripped: Cfg = from_str(&s).unwrap();
+    assert!((original.ratio - roundtripped.ratio).abs() < f64::EPSILON);
+}
+
+// ---------------------------------------------------------------------------
+// Negative integers
+// ---------------------------------------------------------------------------
+
+#[test]
+fn roundtrip_negative_integer() {
+    #[derive(Serialize, Deserialize, PartialEq, Debug)]
+    struct Cfg {
+        offset: i32,
+    }
+    let original = Cfg { offset: -42 };
+    let s = to_string(&original).unwrap();
+    let roundtripped: Cfg = from_str(&s).unwrap();
+    assert_eq!(original, roundtripped);
+}
+
+// ---------------------------------------------------------------------------
+// Empty string
+// ---------------------------------------------------------------------------
+
+#[test]
+fn roundtrip_empty_string() {
+    #[derive(Serialize, Deserialize, PartialEq, Debug)]
+    struct Cfg {
+        val: String,
+    }
+    let original = Cfg { val: String::new() };
+    let s = to_string(&original).unwrap();
+    let roundtripped: Cfg = from_str(&s).unwrap();
+    assert_eq!(original, roundtripped);
+}
+
+// ---------------------------------------------------------------------------
+// Option::Some roundtrip
+// ---------------------------------------------------------------------------
+
+#[test]
+fn roundtrip_option_some() {
+    #[derive(Serialize, Deserialize, PartialEq, Debug)]
+    struct Cfg {
+        val: Option<u32>,
+    }
+    let original = Cfg { val: Some(99) };
+    let s = to_string(&original).unwrap();
+    let roundtripped: Cfg = from_str(&s).unwrap();
+    assert_eq!(original, roundtripped);
+}
+
+// ---------------------------------------------------------------------------
+// Newtype struct
+// ---------------------------------------------------------------------------
+
+#[test]
+fn roundtrip_newtype_struct() {
+    #[derive(Serialize, Deserialize, PartialEq, Debug)]
+    struct Meters(f64);
+
+    #[derive(Serialize, Deserialize, PartialEq, Debug)]
+    struct Cfg {
+        distance: Meters,
+    }
+    let original = Cfg {
+        distance: Meters(1.5),
+    };
+    let s = to_string(&original).unwrap();
+    let roundtripped: Cfg = from_str(&s).unwrap();
+    assert_eq!(original, roundtripped);
+}
+
+// ---------------------------------------------------------------------------
+// Tuple struct
+// ---------------------------------------------------------------------------
+
+#[test]
+fn roundtrip_tuple_struct() {
+    #[derive(Serialize, Deserialize, PartialEq, Debug)]
+    struct Point(f64, f64);
+
+    #[derive(Serialize, Deserialize, PartialEq, Debug)]
+    struct Cfg {
+        origin: Point,
+    }
+    let original = Cfg {
+        origin: Point(1.0, 2.0),
+    };
+    let s = to_string(&original).unwrap();
+    let roundtripped: Cfg = from_str(&s).unwrap();
+    assert_eq!(original, roundtripped);
+}
+
+// ---------------------------------------------------------------------------
+// Unknown fields are ignored
+// ---------------------------------------------------------------------------
+
+#[test]
+fn de_unknown_fields_ignored() {
+    #[derive(Deserialize, PartialEq, Debug)]
+    struct Cfg {
+        known: String,
+    }
+    let cfg: Cfg = from_str("known = hello\nunknown = world\n").unwrap();
+    assert_eq!(cfg.known, "hello");
+}
+
+// ---------------------------------------------------------------------------
+// Unsupported types return errors
+// ---------------------------------------------------------------------------
+
+#[test]
+fn de_bytes_is_unsupported() {
+    // serde_bytes::ByteBuf routes through deserialize_bytes, which we reject.
+    #[derive(Deserialize)]
+    struct Cfg {
+        _val: serde_bytes::ByteBuf,
+    }
+    assert!(from_str::<Cfg>("val = hello\n").is_err());
+}
+
+#[test]
+fn ser_bytes_is_unsupported() {
+    // serde_bytes::Bytes routes through serialize_bytes, which we reject.
+    #[derive(Serialize)]
+    struct Cfg<'a> {
+        #[serde(with = "serde_bytes")]
+        val: &'a [u8],
+    }
+    assert!(to_string(&Cfg { val: b"hello" }).is_err());
 }
