@@ -396,6 +396,146 @@ impl ser::SerializeTupleVariant for SeqSerializer<'_> {
 }
 
 // ---------------------------------------------------------------------------
+// KeySerializer – accepts only string keys; rejects everything else
+// ---------------------------------------------------------------------------
+
+/// A minimal serializer that collects a `str`/`String` map key and returns
+/// [`Error::KeyMustBeString`] for every other type, including `char` and
+/// unit-enum variants.  Only `serialize_str` (and `serialize_newtype_struct`
+/// delegating to it) succeed.
+struct KeySerializer(String);
+
+impl ser::Serializer for &mut KeySerializer {
+    type Ok = ();
+    type Error = Error;
+    type SerializeSeq = ser::Impossible<(), Error>;
+    type SerializeTuple = ser::Impossible<(), Error>;
+    type SerializeTupleStruct = ser::Impossible<(), Error>;
+    type SerializeTupleVariant = ser::Impossible<(), Error>;
+    type SerializeMap = ser::Impossible<(), Error>;
+    type SerializeStruct = ser::Impossible<(), Error>;
+    type SerializeStructVariant = ser::Impossible<(), Error>;
+
+    fn serialize_str(self, v: &str) -> Result<()> {
+        v.clone_into(&mut self.0);
+        Ok(())
+    }
+
+    fn serialize_bool(self, _v: bool) -> Result<()> {
+        Err(Error::KeyMustBeString)
+    }
+    fn serialize_i8(self, _v: i8) -> Result<()> {
+        Err(Error::KeyMustBeString)
+    }
+    fn serialize_i16(self, _v: i16) -> Result<()> {
+        Err(Error::KeyMustBeString)
+    }
+    fn serialize_i32(self, _v: i32) -> Result<()> {
+        Err(Error::KeyMustBeString)
+    }
+    fn serialize_i64(self, _v: i64) -> Result<()> {
+        Err(Error::KeyMustBeString)
+    }
+    fn serialize_u8(self, _v: u8) -> Result<()> {
+        Err(Error::KeyMustBeString)
+    }
+    fn serialize_u16(self, _v: u16) -> Result<()> {
+        Err(Error::KeyMustBeString)
+    }
+    fn serialize_u32(self, _v: u32) -> Result<()> {
+        Err(Error::KeyMustBeString)
+    }
+    fn serialize_u64(self, _v: u64) -> Result<()> {
+        Err(Error::KeyMustBeString)
+    }
+    fn serialize_f32(self, _v: f32) -> Result<()> {
+        Err(Error::KeyMustBeString)
+    }
+    fn serialize_f64(self, _v: f64) -> Result<()> {
+        Err(Error::KeyMustBeString)
+    }
+    fn serialize_char(self, _v: char) -> Result<()> {
+        Err(Error::KeyMustBeString)
+    }
+    fn serialize_bytes(self, _v: &[u8]) -> Result<()> {
+        Err(Error::KeyMustBeString)
+    }
+    fn serialize_none(self) -> Result<()> {
+        Err(Error::KeyMustBeString)
+    }
+    fn serialize_some<T: Serialize + ?Sized>(self, _v: &T) -> Result<()> {
+        Err(Error::KeyMustBeString)
+    }
+    fn serialize_unit(self) -> Result<()> {
+        Err(Error::KeyMustBeString)
+    }
+    fn serialize_unit_struct(self, _name: &'static str) -> Result<()> {
+        Err(Error::KeyMustBeString)
+    }
+    fn serialize_unit_variant(
+        self,
+        _name: &'static str,
+        _idx: u32,
+        _variant: &'static str,
+    ) -> Result<()> {
+        Err(Error::KeyMustBeString)
+    }
+    fn serialize_newtype_struct<T: Serialize + ?Sized>(
+        self,
+        _name: &'static str,
+        value: &T,
+    ) -> Result<()> {
+        value.serialize(self)
+    }
+    fn serialize_newtype_variant<T: Serialize + ?Sized>(
+        self,
+        _name: &'static str,
+        _idx: u32,
+        _variant: &'static str,
+        _value: &T,
+    ) -> Result<()> {
+        Err(Error::KeyMustBeString)
+    }
+    fn serialize_seq(self, _len: Option<usize>) -> Result<Self::SerializeSeq> {
+        Err(Error::KeyMustBeString)
+    }
+    fn serialize_tuple(self, _len: usize) -> Result<Self::SerializeTuple> {
+        Err(Error::KeyMustBeString)
+    }
+    fn serialize_tuple_struct(
+        self,
+        _name: &'static str,
+        _len: usize,
+    ) -> Result<Self::SerializeTupleStruct> {
+        Err(Error::KeyMustBeString)
+    }
+    fn serialize_tuple_variant(
+        self,
+        _name: &'static str,
+        _idx: u32,
+        _variant: &'static str,
+        _len: usize,
+    ) -> Result<Self::SerializeTupleVariant> {
+        Err(Error::KeyMustBeString)
+    }
+    fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap> {
+        Err(Error::KeyMustBeString)
+    }
+    fn serialize_struct(self, _name: &'static str, _len: usize) -> Result<Self::SerializeStruct> {
+        Err(Error::KeyMustBeString)
+    }
+    fn serialize_struct_variant(
+        self,
+        _name: &'static str,
+        _idx: u32,
+        _variant: &'static str,
+        _len: usize,
+    ) -> Result<Self::SerializeStructVariant> {
+        Err(Error::KeyMustBeString)
+    }
+}
+
+// ---------------------------------------------------------------------------
 // MapSerializer – handles maps and structs
 // ---------------------------------------------------------------------------
 
@@ -474,9 +614,9 @@ impl ser::SerializeMap for MapSerializer<'_> {
     type Error = Error;
 
     fn serialize_key<T: Serialize + ?Sized>(&mut self, key: &T) -> Result<()> {
-        let mut k = Serializer::new(0);
-        key.serialize(&mut k)?;
-        self.current_key = Some(k.output);
+        let mut ks = KeySerializer(String::new());
+        key.serialize(&mut ks)?;
+        self.current_key = Some(ks.0);
         Ok(())
     }
 

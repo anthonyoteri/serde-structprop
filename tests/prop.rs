@@ -6,11 +6,28 @@ use serde_structprop::{from_str, to_string};
 // Strategies
 // ---------------------------------------------------------------------------
 
-/// Generate safe structprop scalar strings: printable ASCII with no special
-/// structprop characters (space, `#`, `{`, `}`, `=`, `"`), so they round-trip
-/// as bare scalars without quoting.
+/// Generate structprop scalar strings that round-trip through serialization.
+///
+/// Uses `prop_oneof!` to guarantee coverage of both syntactic classes:
+///
+/// - **Bare** scalars (`[a-zA-Z0-9_.-]+`): serialized without quoting.
+/// - **Quoted** scalars: contain at least one character that forces quoting
+///   (`space`, `\t`, `\n`, `\r`, `#`, `{`, `}`, `=`) and no `"` character,
+///   which is the only character that cannot be represented inside a quoted
+///   value (the format has no escape mechanism for it).
 fn safe_string() -> impl Strategy<Value = String> {
-    "[a-zA-Z0-9_.-]{1,32}".prop_map(|s| s)
+    // Bare: alphanumeric plus the safe punctuation that needs no quoting.
+    let bare = "[a-zA-Z0-9_.\\-]{1,32}".prop_map(|s| s);
+
+    // Quoted: must contain at least one character that triggers quoting.
+    // We use a regex that starts with a mandatory special char, followed by
+    // arbitrary safe content, so the filter always passes.
+    // Characters excluded: `"` (unrepresentable inside quotes).
+    let quoted = "[a-zA-Z0-9_.\\-]{0,15}[ \t\n\r#{}=][a-zA-Z0-9_.\\-]{0,15}"
+        .prop_map(|s| s)
+        .prop_filter("non-empty", |s| !s.is_empty());
+
+    prop_oneof![bare, quoted]
 }
 
 // ---------------------------------------------------------------------------

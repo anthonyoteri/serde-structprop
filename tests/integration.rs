@@ -692,3 +692,45 @@ fn de_option_field_absent_defaults_to_none() {
     let s: S = from_str("name = foo\n").unwrap();
     assert_eq!(s.count, None);
 }
+
+// deserialize_unit must reject non-null values, and accept "null"
+#[test]
+fn de_unit_field_roundtrip() {
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct Doc {
+        key: (),
+    }
+    // "null" is the structprop representation of a unit value — must succeed.
+    let doc: Doc = from_str("key = null\n").expect("expected Ok deserializing null as unit");
+    assert_eq!(doc.key, ());
+
+    // Any non-null scalar must be rejected when the target type is unit.
+    let err: Result<Doc, _> = from_str("key = hello\n");
+    assert!(
+        err.is_err(),
+        "expected error deserializing non-null as unit"
+    );
+}
+
+// serialize_key must return KeyMustBeString for non-string key types.
+// Only str/String keys are accepted; char and enum variants are rejected too.
+#[test]
+fn ser_non_string_map_key_is_an_error() {
+    use std::collections::HashMap;
+
+    // Integer key
+    let mut int_map: HashMap<u32, &str> = HashMap::new();
+    int_map.insert(42, "hello");
+    assert!(
+        to_string(&int_map).is_err(),
+        "expected error serializing integer map key"
+    );
+
+    // char key
+    let mut char_map: HashMap<char, &str> = HashMap::new();
+    char_map.insert('x', "hello");
+    assert!(
+        to_string(&char_map).is_err(),
+        "expected error serializing char map key"
+    );
+}
