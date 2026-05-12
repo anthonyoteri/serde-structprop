@@ -91,10 +91,16 @@ impl Serializer {
 // ---------------------------------------------------------------------------
 
 /// Wrap `s` in double quotes if it contains any structprop special characters
-/// (space, tab, `#`, `{`, `}`, or `=`); otherwise return it unchanged.
+/// (space, tab, newline, carriage return, `#`, `{`, `}`, or `=`); otherwise
+/// return it unchanged.
+///
+/// Note: the structprop format has no escape sequences, so embedded `"` characters
+/// inside a value are not representable. Values containing `"` are returned
+/// wrapped in quotes with the inner `"` intact — callers should avoid such values
+/// or the round-trip will be lossy.
 fn escape(s: &str) -> String {
     if s.chars()
-        .any(|c| matches!(c, ' ' | '\t' | '#' | '{' | '}' | '='))
+        .any(|c| matches!(c, ' ' | '\t' | '\n' | '\r' | '#' | '{' | '}' | '='))
     {
         format!("\"{s}\"")
     } else {
@@ -171,7 +177,8 @@ impl<'a> ser::Serializer for &'a mut Serializer {
     }
 
     fn serialize_char(self, v: char) -> Result<()> {
-        self.output.push(v);
+        // Route through escape() so special characters are quoted.
+        self.output.push_str(&escape(&v.to_string()));
         Ok(())
     }
 
@@ -226,23 +233,22 @@ impl<'a> ser::Serializer for &'a mut Serializer {
         variant: &'static str,
         value: &T,
     ) -> Result<()> {
-        // Encode as: `variant_name {\n  <payload>\n}\n`
-        let pad = self.pad();
-        writeln!(self.output, "{pad}{} {{", escape(variant))
-            .map_err(|e| Error::Message(e.to_string()))?;
-        // Render at indent=0; re-indent each line by pad+2 below.
-        let mut inner = Serializer::new(0);
-        value.serialize(&mut inner)?;
-        for line in inner.output.lines() {
-            writeln!(self.output, "{pad}  {line}").map_err(|e| Error::Message(e.to_string()))?;
-        }
-        writeln!(self.output, "{pad}}}").map_err(|e| Error::Message(e.to_string()))
+        // Encode as `variant = <payload>` (scalar) or `variant { … }` (object block)
+        // so the parser produces Object({"variant": payload}), which is exactly what
+        // deserialize_enum expects for newtype variants.
+        let mut ms = MapSerializer {
+            ser: self,
+            current_key: None,
+            variant_name: None,
+        };
+        ms.write_kv(variant, value)
     }
 
     fn serialize_seq(self, _len: Option<usize>) -> Result<Self::SerializeSeq> {
         Ok(SeqSerializer {
             parent: self,
             items: Vec::new(),
+            variant: None,
         })
     }
 
@@ -265,11 +271,10 @@ impl<'a> ser::Serializer for &'a mut Serializer {
         variant: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeTupleVariant> {
-        // Store the variant name in a sentinel as the first "item" so that
-        // `SerializeTupleVariant::end` can emit the wrapping block.
         Ok(SeqSerializer {
             parent: self,
-            items: vec![format!("__variant__{variant}")],
+            items: Vec::new(),
+            variant: Some(variant.to_owned()),
         })
     }
 
@@ -310,6 +315,8 @@ pub struct SeqSerializer<'a> {
     parent: &'a mut Serializer,
     /// Each element serialized to a string, accumulated for deferred emission.
     items: Vec<String>,
+    /// Set for tuple variants: the variant name to wrap the array under.
+    variant: Option<String>,
 }
 
 impl ser::SerializeSeq for SeqSerializer<'_> {
@@ -370,14 +377,16 @@ impl ser::SerializeTupleVariant for SeqSerializer<'_> {
     }
 
     fn end(self) -> Result<()> {
-        // The first "item" is the sentinel carrying the variant name.
-        let mut items = self.items;
-        let variant = items.remove(0).trim_start_matches("__variant__").to_owned();
+        // Emit as `variant = { item1\n  item2\n … }` so the parser produces
+        // Object({"variant": Array([…])}), matching what deserialize_enum expects.
+        let variant = self
+            .variant
+            .expect("variant name must be set for SerializeTupleVariant");
         let pad = self.parent.pad();
         let inner_pad = " ".repeat(self.parent.indent + 2);
-        writeln!(self.parent.output, "{pad}{} {{", escape(&variant))
+        writeln!(self.parent.output, "{pad}{} = {{", escape(&variant))
             .map_err(|e| Error::Message(e.to_string()))?;
-        for item in &items {
+        for item in &self.items {
             writeln!(self.parent.output, "{inner_pad}{item}")
                 .map_err(|e| Error::Message(e.to_string()))?;
         }
@@ -411,7 +420,10 @@ impl MapSerializer<'_> {
         value.serialize(&mut inner)?;
         let rendered = inner.output;
 
-        if rendered.contains('\n') && !rendered.trim_start().starts_with('{') {
+        if rendered.contains('\n')
+            && !rendered.trim_start().starts_with('{')
+            && !rendered.trim_start().starts_with('"')
+        {
             // Multi-line object block → `key {\n  …lines re-indented…\n}\n`
             writeln!(self.ser.output, "{pad}{} {{", escape(key))
                 .map_err(|e| Error::Message(e.to_string()))?;
