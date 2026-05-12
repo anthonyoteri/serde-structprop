@@ -2,6 +2,13 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v0.1.1](https://github.com/anthonyoteri/serde-structprop/compare/a4e598c415086d1ede3d47a287fe0dcfaefb346d..v0.1.1) - 2026-05-12
+#### Bug Fixes
+- add v prefix to cog tags to match release.yml trigger (#17) - ([080bd5e](https://github.com/anthonyoteri/serde-structprop/commit/080bd5e176064340f115295fc8e40ca84aa59df6)) - [@anthonyoteri](https://github.com/anthonyoteri)
+- write release notes to /tmp to avoid cargo publish dirty check (#18) - ([a4e598c](https://github.com/anthonyoteri/serde-structprop/commit/a4e598c415086d1ede3d47a287fe0dcfaefb346d)) - [@anthonyoteri](https://github.com/anthonyoteri)
+
+- - -
+
 ## [0.1.0](https://github.com/anthonyoteri/serde-structprop/compare/fe9b010d2510bf5d051f48d554cd426c597332ba..0.1.0) - 2026-05-12
 #### Features
 - improve Cargo.toml metadata and make serde derive optional (#3) - ([e3c726e](https://github.com/anthonyoteri/serde-structprop/commit/e3c726ec64cc2cb6bd14b962780419825c4aa5a6)) - [@anthonyoteri](https://github.com/anthonyoteri)
