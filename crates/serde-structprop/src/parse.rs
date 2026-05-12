@@ -69,7 +69,8 @@ pub enum Value {
 /// # Errors
 ///
 /// Returns [`Error::Parse`] if the input contains unexpected tokens or
-/// violates the structprop grammar.
+/// violates the structprop grammar.  The error message includes the 1-indexed
+/// line number where the problem was detected.
 ///
 /// # Examples
 ///
@@ -82,7 +83,7 @@ pub enum Value {
 /// }
 /// ```
 pub fn parse(input: &str) -> Result<Value> {
-    let tokens = tokenize(input);
+    let tokens = tokenize(input)?;
     let mut pos = 0usize;
     let map = parse_object(&tokens, &mut pos, /*top_level=*/ true)?;
     Ok(Value::Object(map))
@@ -92,10 +93,14 @@ pub fn parse(input: &str) -> Result<Value> {
 // Internal parser helpers
 // ---------------------------------------------------------------------------
 
-/// Return a reference to the token at `pos` without advancing, defaulting to
-/// [`Token::Eof`] when `pos` is out of bounds.
-fn peek(tokens: &[Token], pos: usize) -> &Token {
-    tokens.get(pos).unwrap_or(&Token::Eof)
+/// Return a reference to the token at `pos` without advancing.
+fn peek(tokens: &[(Token, u32)], pos: usize) -> &Token {
+    tokens.get(pos).map_or(&Token::Eof, |(tok, _)| tok)
+}
+
+/// Return the source line of the token at `pos`.
+fn line_at(tokens: &[(Token, u32)], pos: usize) -> u32 {
+    tokens.get(pos).map_or(0, |&(_, line)| line)
 }
 
 /// Advance the position cursor by one.
@@ -108,15 +113,21 @@ fn advance(pos: &mut usize) {
 ///
 /// # Errors
 ///
-/// Returns [`Error::Parse`] if the next token is not a term.
-fn expect_term(tokens: &[Token], pos: &mut usize) -> Result<String> {
+/// Returns [`Error::Parse`] with a line number if the next token is not a term.
+fn expect_term(tokens: &[(Token, u32)], pos: &mut usize) -> Result<String> {
+    let line = line_at(tokens, *pos);
     match tokens.get(*pos) {
-        Some(Token::Term(s)) => {
+        Some((Token::Term(s), _)) => {
             let s = s.clone();
             advance(pos);
             Ok(s)
         }
-        other => Err(Error::Parse(format!("expected term, got {other:?}"))),
+        other => {
+            let tok = other.map(|(t, _)| t);
+            Err(Error::Parse(format!(
+                "line {line}: expected term, got {tok:?}"
+            )))
+        }
     }
 }
 
@@ -129,35 +140,41 @@ fn expect_term(tokens: &[Token], pos: &mut usize) -> Result<String> {
 ///
 /// Returns [`Error::Parse`] on malformed input.
 fn parse_object(
-    tokens: &[Token],
+    tokens: &[(Token, u32)],
     pos: &mut usize,
     top_level: bool,
 ) -> Result<IndexMap<String, Value>> {
     let mut map = IndexMap::new();
 
     loop {
+        let line = line_at(tokens, *pos);
         match peek(tokens, *pos) {
             Token::Eof => {
                 if top_level {
                     break;
                 }
-                return Err(Error::Parse("unexpected EOF inside object".to_owned()));
+                return Err(Error::Parse(format!(
+                    "line {line}: unexpected EOF inside object"
+                )));
             }
             Token::Close => {
                 if top_level {
-                    return Err(Error::Parse("unexpected '}'".to_owned()));
+                    return Err(Error::Parse(format!("line {line}: unexpected '}}'")));
                 }
                 advance(pos); // consume '}'
                 break;
             }
             Token::Term(_) => {
                 let key = expect_term(tokens, pos)?;
+                let after_line = line_at(tokens, *pos);
                 match peek(tokens, *pos) {
                     Token::Eq => {
                         advance(pos); // consume '='
                         let val = parse_value(tokens, pos)?;
                         if map.contains_key(&key) {
-                            return Err(Error::Parse(format!("duplicate key '{key}'")));
+                            return Err(Error::Parse(format!(
+                                "line {after_line}: duplicate key '{key}'"
+                            )));
                         }
                         map.insert(key, val);
                     }
@@ -165,19 +182,23 @@ fn parse_object(
                         advance(pos); // consume '{'
                         let sub = parse_object(tokens, pos, /*top_level=*/ false)?;
                         if map.contains_key(&key) {
-                            return Err(Error::Parse(format!("duplicate key '{key}'")));
+                            return Err(Error::Parse(format!(
+                                "line {after_line}: duplicate key '{key}'"
+                            )));
                         }
                         map.insert(key, Value::Object(sub));
                     }
                     other => {
                         return Err(Error::Parse(format!(
-                            "expected '=' or '{{' after key '{key}', got {other:?}"
+                            "line {after_line}: expected '=' or '{{' after key '{key}', got {other:?}"
                         )));
                     }
                 }
             }
             other => {
-                return Err(Error::Parse(format!("unexpected token {other:?}")));
+                return Err(Error::Parse(format!(
+                    "line {line}: unexpected token {other:?}"
+                )));
             }
         }
     }
@@ -190,7 +211,8 @@ fn parse_object(
 /// # Errors
 ///
 /// Returns [`Error::Parse`] on unexpected tokens.
-fn parse_value(tokens: &[Token], pos: &mut usize) -> Result<Value> {
+fn parse_value(tokens: &[(Token, u32)], pos: &mut usize) -> Result<Value> {
+    let line = line_at(tokens, *pos);
     match peek(tokens, *pos) {
         Token::Open => {
             advance(pos); // consume '{'
@@ -200,7 +222,9 @@ fn parse_value(tokens: &[Token], pos: &mut usize) -> Result<Value> {
             let s = expect_term(tokens, pos)?;
             Ok(Value::Scalar(s))
         }
-        other => Err(Error::Parse(format!("expected value, got {other:?}"))),
+        other => Err(Error::Parse(format!(
+            "line {line}: expected value, got {other:?}"
+        ))),
     }
 }
 
@@ -214,17 +238,20 @@ fn parse_value(tokens: &[Token], pos: &mut usize) -> Result<Value> {
 /// # Errors
 ///
 /// Returns [`Error::Parse`] on unexpected tokens or premature EOF.
-fn parse_array_or_object_list(tokens: &[Token], pos: &mut usize) -> Result<Value> {
+fn parse_array_or_object_list(tokens: &[(Token, u32)], pos: &mut usize) -> Result<Value> {
     let mut items: Vec<Value> = Vec::new();
 
     loop {
+        let line = line_at(tokens, *pos);
         match peek(tokens, *pos) {
             Token::Close => {
                 advance(pos); // consume '}'
                 break;
             }
             Token::Eof => {
-                return Err(Error::Parse("unexpected EOF inside array".to_owned()));
+                return Err(Error::Parse(format!(
+                    "line {line}: unexpected EOF inside array"
+                )));
             }
             Token::Open => {
                 // A nested object literal inside an array: { key = val … }
@@ -238,7 +265,7 @@ fn parse_array_or_object_list(tokens: &[Token], pos: &mut usize) -> Result<Value
             }
             other @ Token::Eq => {
                 return Err(Error::Parse(format!(
-                    "unexpected token in array: {other:?}"
+                    "line {line}: unexpected token in array: {other:?}"
                 )));
             }
         }
@@ -383,5 +410,15 @@ mod tests {
         if let Value::Object(map) = v {
             assert_eq!(map["enabled"].as_bool(), Some(true));
         }
+    }
+
+    #[test]
+    fn error_includes_line_number() {
+        let input = "good = ok\nbad = {\n";
+        let err = parse(input).unwrap_err().to_string();
+        assert!(
+            err.contains("line "),
+            "expected a line number in error: {err}"
+        );
     }
 }

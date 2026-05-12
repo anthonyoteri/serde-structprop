@@ -54,8 +54,31 @@ jobs:
             echo "No structured changelog available for $GITHUB_REF_NAME." > /tmp/release_notes.md
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Publish to crates.io
-        run: cargo publish
+      - name: Publish serde-structprop to crates.io
+        run: cargo publish -p serde-structprop
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Wait for serde-structprop to be indexed on crates.io
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          URL="https://crates.io/api/v1/crates/serde-structprop/${VERSION}"
+          echo "Polling ${URL} ..."
+          for i in $(seq 1 24); do
+            STATUS=$(curl -sf -o /dev/null -w "%{http_code}" \
+              -H "User-Agent: serde-structprop-release-ci" "${URL}") && \
+            if [ "$STATUS" = "200" ]; then
+              echo "serde-structprop ${VERSION} is available on crates.io"
+              exit 0
+            fi
+            echo "Attempt ${i}/24: not yet indexed (HTTP ${STATUS}), retrying in 10s..."
+            sleep 10
+          done
+          echo "Timed out waiting for serde-structprop ${VERSION} to appear on crates.io"
+          exit 1
+
+      - name: Publish structprop-validator to crates.io
+        run: cargo publish -p structprop-validator
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 

@@ -115,6 +115,8 @@ jobs:
 
       - name: Check semver compatibility
         uses: obi1kenobi/cargo-semver-checks-action@v2
+        with:
+          package: serde-structprop
 
   deny:
     name: Cargo deny

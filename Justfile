@@ -7,16 +7,16 @@ default:
 
 # Run the full test suite
 test:
-    cargo test
+    cargo test --workspace
 
 # Check formatting and lints (mirrors CI)
 check:
-    cargo fmt --check
-    cargo clippy --all-targets -- -W clippy::pedantic
+    cargo fmt --check --all
+    cargo clippy --workspace --all-targets -- -W clippy::pedantic
 
 # Auto-format the source
 fmt:
-    cargo fmt
+    cargo fmt --all
 
 # Validate conventional commit history
 commits:
@@ -73,12 +73,12 @@ release:
 
     # Run the full test suite before touching anything.
     echo "==> Running tests..."
-    cargo test
+    cargo test --workspace
 
     # Check formatting and lints.
     echo "==> Checking formatting and lints..."
-    cargo fmt --check
-    cargo clippy --all-targets -- -W clippy::pedantic
+    cargo fmt --check --all
+    cargo clippy --workspace --all-targets -- -W clippy::pedantic
 
     # Determine the next version without making any changes yet.
     # cog bump --auto --dry-run prints e.g. "v0.1.0" to stdout.
@@ -139,9 +139,13 @@ push-tag:
     echo "==> Pulling latest main..."
     git pull --ff-only origin main
 
-    # Read the version from Cargo.toml.
-    version=$(grep -m1 '^version' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')
-    tag="v${version}"
+    # Find the most recent local vX.Y.Z tag left by `cog bump --auto`.
+    tag=$(git tag --list 'v*.*.*' --sort=-version:refname | head -1)
+    if [[ -z "$tag" ]]; then
+        echo "error: no local vX.Y.Z tag found — did you run 'just release' first?" >&2
+        exit 1
+    fi
+    version="${tag#v}"
     echo "==> Tagging HEAD as ${tag}..."
 
     # Guard: tag must not already exist on origin.
