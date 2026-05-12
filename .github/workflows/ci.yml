@@ -116,6 +116,17 @@ jobs:
       - name: Check semver compatibility
         uses: obi1kenobi/cargo-semver-checks-action@v2
 
+  deny:
+    name: Cargo deny
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Check licenses, advisories, and bans
+        uses: EmbarkStudios/cargo-deny-action@v2
+
   msrv:
     name: MSRV
     runs-on: ubuntu-latest
