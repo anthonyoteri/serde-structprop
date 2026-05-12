@@ -8,7 +8,6 @@ tag_prefix = "v"
 # The .bak suffix is needed for macOS compatibility with sed -i.
 pre_bump_hooks = [
     "sed -i.bak 's/^version = \"[^\"]*\"/version = \"{{version}}\"/' Cargo.toml && rm -f Cargo.toml.bak",
-    "cargo build --locked --quiet",
 ]
 
 [changelog]
