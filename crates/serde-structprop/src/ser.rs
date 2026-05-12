@@ -271,10 +271,12 @@ impl<'a> ser::Serializer for &'a mut Serializer {
         // Encode as `variant = <payload>` (scalar) or `variant { … }` (object block)
         // so the parser produces Object({"variant": payload}), which is exactly what
         // deserialize_enum expects for newtype variants.
+        let start_pos = self.output.len();
         let mut ms = MapSerializer {
             ser: self,
             current_key: None,
             variant_name: None,
+            start_pos,
         };
         ms.write_kv(variant, value)
     }
@@ -315,10 +317,12 @@ impl<'a> ser::Serializer for &'a mut Serializer {
 
     fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap> {
         self.is_object = true;
+        let start_pos = self.output.len();
         Ok(MapSerializer {
             ser: self,
             current_key: None,
             variant_name: None,
+            start_pos,
         })
     }
 
@@ -333,10 +337,17 @@ impl<'a> ser::Serializer for &'a mut Serializer {
         variant: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeStructVariant> {
+        let start_pos = self.output.len();
+        // Fields inside the variant wrapper must sit two levels deeper than the
+        // wrapper header itself, so bump indent before handing `self` over to
+        // the MapSerializer.  `end()` will derive the header/footer pad from
+        // `ser.indent.saturating_sub(2)`, which then equals the original indent.
+        self.indent += 2;
         Ok(MapSerializer {
             ser: self,
             current_key: None,
             variant_name: Some(variant.to_owned()),
+            start_pos,
         })
     }
 }
@@ -612,6 +623,10 @@ pub struct MapSerializer<'a> {
     current_key: Option<String>,
     /// If `Some`, wrap all emitted content in a `variant_name { … }` block.
     variant_name: Option<String>,
+    /// Byte offset into `ser.output` at which this value began being written.
+    /// Used by struct-variant serialization to insert the header at the correct
+    /// position rather than at the start of the entire output buffer.
+    start_pos: usize,
 }
 
 impl MapSerializer<'_> {
@@ -699,7 +714,7 @@ impl ser::SerializeMap for MapSerializer<'_> {
             let pad = " ".repeat(self.ser.indent.saturating_sub(2));
             let header = format!("{pad}{} {{\n", escape(&variant)?);
             let footer = format!("{pad}}}\n");
-            self.ser.output.insert_str(0, &header);
+            self.ser.output.insert_str(self.start_pos, &header);
             self.ser.output.push_str(&footer);
         }
         Ok(())
