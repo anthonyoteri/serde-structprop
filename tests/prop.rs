@@ -6,11 +6,23 @@ use serde_structprop::{from_str, to_string};
 // Strategies
 // ---------------------------------------------------------------------------
 
-/// Generate safe structprop scalar strings: printable ASCII with no special
-/// structprop characters (space, `#`, `{`, `}`, `=`, `"`), so they round-trip
-/// as bare scalars without quoting.
+/// Generate structprop scalar strings that round-trip through serialization.
+///
+/// The strategy covers two classes:
+/// - **Bare** scalars (`[a-zA-Z0-9_.-]+`) that need no quoting.
+/// - **Quoted** scalars that contain at least one character requiring quoting
+///   (`space`, `\t`, `#`, `{`, `}`, `=`) but no characters that are
+///   unescapable inside a quoted string (`"`, `\n`, `\r`).
+///
+/// Strings containing `"`, `\n`, or `\r` are excluded because the format has
+/// no escape mechanism for them inside a quoted value.
 fn safe_string() -> impl Strategy<Value = String> {
-    "[a-zA-Z0-9_.-]{1,32}".prop_map(|s| s)
+    // Printable ASCII-ish chars excluding `"`, `\n`, `\r` (unescapable inside
+    // a quoted value).  Includes space, tab and structprop metacharacters so
+    // that the quoted path is exercised, not just the bare-scalar path.
+    "[a-zA-Z0-9_.\\-\t #{}= ]{1,32}"
+        .prop_map(|s| s.trim().to_owned())
+        .prop_filter("non-empty after trim", |s| !s.is_empty())
 }
 
 // ---------------------------------------------------------------------------
