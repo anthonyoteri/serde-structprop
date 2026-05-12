@@ -2,7 +2,7 @@
 //!
 //! The lexer converts a raw `&str` into a flat sequence of `Token`s, stripping
 //! comments and collapsing insignificant whitespace.  The resulting token stream
-//! is consumed by [`parse()`].
+//! is consumed by [`crate::parse()`].
 //!
 //! # Token rules
 //!
