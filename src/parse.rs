@@ -1,7 +1,7 @@
 //! Parser for the structprop format.
 //!
 //! This module contains the [`Value`] type that represents a parsed structprop
-//! document and the [`parse`] function that converts a raw `&str` into a
+//! document and the [`parse()`] function that converts a raw `&str` into a
 //! [`Value::Object`] tree.
 //!
 //! # Grammar (informal)
@@ -22,7 +22,7 @@ use indexmap::IndexMap;
 // Public types
 // ---------------------------------------------------------------------------
 
-/// A node in the structprop value tree produced by [`parse`].
+/// A node in the structprop value tree produced by [`parse()`].
 ///
 /// The tree maps directly onto structprop's three syntactic forms:
 ///

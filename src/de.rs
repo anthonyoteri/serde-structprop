@@ -1,8 +1,8 @@
 //! Serde [`Deserializer`](serde::Deserializer) for the structprop format.
 //!
 //! The public entry point is [`from_str`].  Internally the input is first
-//! parsed into a [`Value`] tree by [`crate::parse`], then the tree is walked
-//! by [`ValueDeserializer`] which implements [`serde::Deserializer`].
+//! parsed into a [`Value`] tree by [`parse()`], then the tree is walked
+//! by a `ValueDeserializer` which implements [`serde::Deserializer`].
 //!
 //! # Type mapping
 //!
