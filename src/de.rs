@@ -287,10 +287,9 @@ impl<'de> de::Deserializer<'de> for ValueDeserializer {
             Value::Object(map) => {
                 // Newtype / tuple / struct variant: a single-entry object whose
                 // key is the variant name and whose value is the payload.
-                if map.len() != 1 {
+                let Some((variant, payload)) = map.into_iter().next() else {
                     return Err(Error::Parse("enum object must have exactly one key".into()));
-                }
-                let (variant, payload) = map.into_iter().next().unwrap();
+                };
                 visitor.visit_enum(EnumDe { variant, payload })
             }
             Value::Array(_) => Err(Error::Parse("expected scalar or object for enum".into())),
