@@ -1,6 +1,10 @@
 # serde-structprop
 
 [![CI](https://github.com/anthonyoteri/serde-structprop/actions/workflows/ci.yml/badge.svg)](https://github.com/anthonyoteri/serde-structprop/actions/workflows/ci.yml)
+[![crates.io](https://img.shields.io/crates/v/serde-structprop.svg)](https://crates.io/crates/serde-structprop)
+[![docs.rs](https://docs.rs/serde-structprop/badge.svg)](https://docs.rs/serde-structprop)
+[![Rust version](https://img.shields.io/badge/rustc-1.85+-orange.svg)](https://blog.rust-lang.org/2025/02/20/Rust-1.85.0.html)
+[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE-MIT)
 
 A [serde](https://serde.rs/) serializer and deserializer for the
 [structprop](https://github.com/edgeware/structprop) configuration file format —
