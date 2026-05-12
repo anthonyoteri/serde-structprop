@@ -100,8 +100,9 @@ impl Serializer {
 /// a literal `"` will serialize to syntactically ambiguous output. Such strings
 /// cannot round-trip through this format.
 fn escape(s: &str) -> String {
-    if s.chars()
-        .any(|c| matches!(c, ' ' | '\t' | '\n' | '\r' | '#' | '{' | '}' | '='))
+    if s.is_empty()
+        || s.chars()
+            .any(|c| matches!(c, ' ' | '\t' | '\n' | '\r' | '#' | '{' | '}' | '='))
     {
         format!("\"{s}\"")
     } else {
