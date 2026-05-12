@@ -749,7 +749,10 @@ fn ser_empty_string_is_quoted() {
     }
     let original = Cfg { val: String::new() };
     let s = to_string(&original).unwrap();
-    assert!(s.contains("val = \"\""), "expected quoted empty string, got: {s:?}");
+    assert!(
+        s.contains("val = \"\""),
+        "expected quoted empty string, got: {s:?}"
+    );
     let roundtripped: Cfg = from_str(&s).unwrap();
     assert_eq!(original, roundtripped);
 }
