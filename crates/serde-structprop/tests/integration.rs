@@ -471,8 +471,7 @@ fn ser_struct_variant_does_not_corrupt_preceding_fields() {
     };
     let out = to_string(&cfg).unwrap();
     assert_eq!(
-        out,
-        "name = test\nshape {\n  Circle {\n    radius = 5\n  }\n}\n",
+        out, "name = test\nshape {\n  Circle {\n    radius = 5\n  }\n}\n",
         "struct-variant header must appear at the correct position, got:\n{out}"
     );
 }
