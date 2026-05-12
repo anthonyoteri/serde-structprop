@@ -29,12 +29,14 @@ use indexmap::IndexMap;
 /// | Structprop syntax | Variant |
 /// |---|---|
 /// | `key = value` | [`Value::Scalar`] |
-/// | `key = { a b c }` | [`Value::Array`] |
+/// | `key = { a b c }` | [`Value::Array`] of [`Value::Scalar`]s |
+/// | `key = { { k = v } { k = v } }` | [`Value::Array`] of [`Value::Object`]s |
 /// | `key { … }` | [`Value::Object`] |
 ///
-/// Scalar strings are stored verbatim; numeric or boolean coercion is
-/// performed lazily via the [`Value::as_bool`], [`Value::as_i64`], and
-/// [`Value::as_f64`] helpers.
+/// Scalar strings are stored verbatim (no coercion at parse time); numeric
+/// or boolean coercion is performed lazily via the [`Value::as_bool`],
+/// [`Value::as_i64`], and [`Value::as_f64`] helpers.  Duplicate keys within
+/// any object block are detected and rejected during parsing.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     /// A bare or quoted string token, stored as-is (no coercion applied).
@@ -45,9 +47,9 @@ pub enum Value {
 
     /// An ordered list of values, corresponding to `key = { … }` syntax.
     ///
-    /// Array items may themselves be [`Value::Scalar`]s or
-    /// [`Value::Object`]s (the latter written as `{ key = val … }` inside the
-    /// outer braces).
+    /// Array items may be [`Value::Scalar`]s (bare terms) or
+    /// [`Value::Object`]s (written as `{ key = val … }` inline sub-objects).
+    /// Duplicate keys within a sub-object are rejected at parse time.
     Array(Vec<Value>),
 
     /// An ordered map from string keys to values, corresponding to either a

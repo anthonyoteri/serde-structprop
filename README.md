@@ -21,6 +21,7 @@ Structprop files are composed of three constructs:
 key = value
 key = "value with spaces or special chars"
 key = 42
+key = -7
 key = true
 
 # Nested object block
@@ -38,12 +39,23 @@ list = {
 }
 ```
 
-**Special characters** in values (spaces, tabs, `#`, `{`, `}`, `=`) must be
-wrapped in double quotes.  Keys follow the same rule.
+**Special characters** in values (spaces, tabs, newlines, carriage returns,
+`#`, `{`, `}`, `=`) must be wrapped in double quotes.  Empty strings are
+always quoted as `""`.  Keys follow the same rule.
 
 ## Installation
 
 Add to your `Cargo.toml`:
+
+```toml
+[dependencies]
+serde-structprop = { version = "0.1", features = ["derive"] }
+```
+
+The `derive` feature enables serde's own derive macros.  You still need a
+direct `serde` dependency in your crate so that `Serialize` and `Deserialize`
+are in scope.  If you already depend on `serde` with `features = ["derive"]`,
+you can omit the feature flag here:
 
 ```toml
 [dependencies]
@@ -56,15 +68,22 @@ serde-structprop = "0.1"
 | Rust / serde type | Structprop representation |
 |---|---|
 | `bool` | `true` or `false` |
-| integer / float | bare numeric scalar |
-| `String` / `&str` | bare scalar, or `"quoted"` when it contains special chars |
-| `Option<T>` (Some) | the inner value |
+| `i8` `i16` `i32` `i64` `u8` `u16` `u32` `u64` | bare integer scalar (e.g. `42`, `-7`) |
+| `f32`, `f64` | bare float scalar (e.g. `3.14`) |
+| `char` | bare single-character scalar |
+| `String` / `&str` | bare scalar, or `"quoted"` when it contains special chars or is empty |
+| `Option<T>` (Some) | the inner value serialized normally |
 | `Option<T>` (None) / `()` | `null` |
+| newtype struct (e.g. `struct Meters(f64)`) | transparent — serializes as the inner type |
+| unit struct (e.g. `struct Marker;`) | `null` |
 | struct / map | `key { … }` block |
 | `Vec<T>` / sequence | `key = { … }` list |
+| tuple / tuple struct | `key = { … }` list of elements |
 | unit enum variant | bare variant name |
-| newtype / tuple / struct enum variant | `variant_name { … }` block |
-| raw `&[u8]` | **unsupported** — returns `Error::UnsupportedType` |
+| newtype enum variant | `variant_name = <scalar or list>` |
+| tuple enum variant | `variant_name = { … }` list |
+| struct enum variant | `variant_name { … }` block |
+| raw bytes (`serialize_bytes` / `deserialize_bytes`) | **unsupported** — returns `Error::UnsupportedType` |
 
 ## Quick start
 
@@ -175,8 +194,9 @@ fn main() {
 
 ### Quoted values
 
-Values containing spaces or structprop special characters (`#`, `{`, `}`, `=`)
-must be quoted in the input and are quoted automatically on output:
+Values containing spaces, tabs, newlines, or the special characters
+(`#`, `{`, `}`, `=`) are quoted automatically on output and must be
+quoted in the input.  Empty strings are always quoted as `""`:
 
 ```rust
 use serde::{Deserialize, Serialize};
@@ -185,32 +205,52 @@ use serde_structprop::{from_str, to_string};
 #[derive(Debug, Serialize, Deserialize)]
 struct S {
     message: String,
+    empty: String,
 }
 
 fn main() {
-    let s: S = from_str(r#"message = "hello world""#).unwrap();
+    let s: S = from_str(r#"message = "hello world"
+empty = """#).unwrap();
     assert_eq!(s.message, "hello world");
+    assert_eq!(s.empty, "");
 
     let out = to_string(&s).unwrap();
-    assert_eq!(out, "message = \"hello world\"\n");
+    assert_eq!(out, "message = \"hello world\"\nempty = \"\"\n");
 }
 ```
 
 ### Optional fields
 
+Fields typed as `Option<T>` are serialized as `null` when `None` and as
+the inner value when `Some`.  A missing key in the input also deserializes
+as `None`:
+
 ```rust
 use serde::{Deserialize, Serialize};
-use serde_structprop::from_str;
+use serde_structprop::{from_str, to_string};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 struct S {
     required: String,
     optional: Option<u32>,
 }
 
 fn main() {
+    // Some value
     let s: S = from_str("required = hello\noptional = 42\n").unwrap();
     assert_eq!(s.optional, Some(42));
+
+    // Explicit null
+    let s: S = from_str("required = hello\noptional = null\n").unwrap();
+    assert_eq!(s.optional, None);
+
+    // Missing key also deserializes as None
+    let s: S = from_str("required = hello\n").unwrap();
+    assert_eq!(s.optional, None);
+
+    // None serializes as null
+    let out = to_string(&S { required: "hello".into(), optional: None }).unwrap();
+    assert!(out.contains("optional = null"));
 }
 ```
 
@@ -227,8 +267,8 @@ struct S { x: u32 }
 
 match from_str::<S>("x = not_a_number\n") {
     Ok(s)                    => println!("x = {}", s.x),
-    Err(Error::Parse(msg))   => eprintln!("syntax error: {msg}"),
-    Err(Error::Message(msg)) => eprintln!("type error: {msg}"),
+    Err(Error::Parse(msg))   => eprintln!("parse error: {msg}"),
+    Err(Error::Message(msg)) => eprintln!("serde error: {msg}"),
     Err(e)                   => eprintln!("other error: {e}"),
 }
 ```
@@ -237,19 +277,19 @@ match from_str::<S>("x = not_a_number\n") {
 
 | Variant | When |
 |---|---|
-| `Error::Parse(String)` | Lexer or parser encountered unexpected input |
-| `Error::Message(String)` | serde type mismatch (e.g. string where integer expected) |
-| `Error::UnsupportedType(&str)` | Type has no structprop equivalent (e.g. `&[u8]`) |
+| `Error::Parse(String)` | Lexer or parser encountered unexpected input, or a scalar could not be coerced to the requested numeric type |
+| `Error::Message(String)` | serde-generated error (e.g. missing required field, unknown variant) |
+| `Error::UnsupportedType(&'static str)` | Type has no structprop equivalent (e.g. raw byte slices) |
 | `Error::KeyMustBeString` | A map was serialized with a non-string key |
 
 ## Module layout
 
 | Module | Contents |
 |---|---|
-| `serde_structprop::de` | `Deserializer` implementation; `from_str` entry point |
-| `serde_structprop::ser` | `Serializer` implementation; `to_string` entry point |
-| `serde_structprop::parse` | Recursive-descent parser; `Value` AST enum |
-| `serde_structprop::lexer` | Tokenizer; `Token` enum |
+| `serde_structprop::lexer` | Tokenizer: converts raw text to `Token`s |
+| `serde_structprop::parse` | Recursive-descent parser: produces a `Value` tree |
+| `serde_structprop::de` | `serde::Deserializer` implementation; `from_str` entry point |
+| `serde_structprop::ser` | `serde::Serializer` implementation; `to_string` entry point |
 | `serde_structprop::error` | `Error` enum and `Result<T>` alias |
 
 ## License

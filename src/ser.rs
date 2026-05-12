@@ -9,13 +9,18 @@
 //! | Rust / serde | Structprop output |
 //! |---|---|
 //! | `bool` | `true` or `false` scalar |
-//! | integer / float | numeric scalar |
-//! | `String` / `&str` | bare scalar or `"quoted"` if it contains special chars |
-//! | `None` / `()` | `null` scalar |
+//! | `i8`–`i64`, `u8`–`u64` | bare integer scalar (e.g. `42`, `-7`) |
+//! | `f32`, `f64` | bare float scalar (e.g. `3.14`) |
+//! | `char` | bare single-character scalar (quoted if the character is special) |
+//! | `String` / `&str` | bare scalar, or `"quoted"` if it contains spaces, tabs, newlines, carriage returns, `#`, `{`, `}`, `=`, or is empty |
+//! | `None` / `()` / unit struct | `null` scalar |
+//! | newtype struct | transparent — serializes as the inner value |
 //! | struct / map | `key { … }` block at the current indentation level |
-//! | `Vec<T>` / sequence | `= { … }` inline list |
+//! | `Vec<T>` / sequence / tuple / tuple struct | `= { … }` inline list |
 //! | unit enum variant | bare variant name scalar |
-//! | newtype / tuple / struct enum variant | `variant_name { … }` block |
+//! | newtype enum variant | `variant_name = <scalar or list>` |
+//! | tuple enum variant | `variant_name = { … }` list |
+//! | struct enum variant | `variant_name { … }` block |
 
 use std::fmt::Write as FmtWrite;
 
@@ -90,9 +95,9 @@ impl Serializer {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/// Wrap `s` in double quotes if it is empty or contains any structprop special
-/// characters (space, tab, newline, carriage return, `#`, `{`, `}`, or `=`);
-/// otherwise return it unchanged.
+/// Wrap `s` in double quotes if it is empty or contains any of the following
+/// characters: space (` `), tab (`\t`), newline (`\n`), carriage return
+/// (`\r`), `#`, `{`, `}`, or `=`.  Otherwise return it unchanged.
 ///
 /// Empty strings are always quoted so that they survive a round-trip: a bare
 /// empty value would produce `key = ` with no token after `=`, which the

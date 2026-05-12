@@ -9,12 +9,17 @@
 //! | Structprop | Rust / serde |
 //! |---|---|
 //! | scalar `"true"` / `"false"` | `bool` |
-//! | scalar integer string | `i8`–`i64`, `u8`–`u64` |
-//! | scalar float string | `f32`, `f64` |
-//! | scalar `"null"` | `None` / `()` |
+//! | scalar integer string (e.g. `42`, `-7`) | `i8`–`i64`, `u8`–`u64` |
+//! | scalar float string (e.g. `3.14`) | `f32`, `f64` |
+//! | single-character scalar | `char` |
+//! | scalar `"null"` | `Option<T>` (`None`) / `()` / unit struct |
 //! | any other scalar | `String` / `&str` |
-//! | `key = { … }` | `Vec<T>` / tuple |
+//! | scalar (inner type) | newtype struct — transparent wrapper |
+//! | `key = { … }` | `Vec<T>` / tuple / tuple struct |
 //! | `key { … }` | struct / map |
+//! | bare variant name | unit enum variant |
+//! | `variant_name = <scalar or list>` | newtype / tuple enum variant |
+//! | `variant_name { … }` | struct enum variant |
 
 use crate::error::{Error, Result};
 use crate::parse::{parse, Value};
