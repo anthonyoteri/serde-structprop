@@ -25,17 +25,27 @@ commits:
 # ---------------------------------------------------------------------------
 # Release
 # ---------------------------------------------------------------------------
-
-# Bump the version, generate CHANGELOG.md, commit, tag, and push.
 #
-# Uses `cog bump --auto` to determine the next semver version from the
-# conventional commit history, then pushes both the bump commit and the
-# new version tag so that the CI release workflow publishes to crates.io.
+# Two-step process to work with branch protection on main:
+#
+#   Step 1 — just release
+#     Runs pre-flight checks, calls `cog bump --auto` on a local release
+#     branch, opens a PR.  Review and merge the PR normally.
+#
+#   Step 2 — just push-tag
+#     After the PR is merged, pushes the local tag created by cog.
+#     The tag push triggers release.yml which publishes to crates.io.
 #
 # Prerequisites:
-#   - Working tree must be clean (no uncommitted changes).
-#   - Must be on the `main` branch and up to date with origin.
-#   - `cocogitto` must be installed (`cargo install cocogitto`).
+#   - `cocogitto` installed: cargo install cocogitto
+#   - `gh` CLI installed and authenticated: https://cli.github.com
+# ---------------------------------------------------------------------------
+
+# Step 1: open a release PR.
+#
+# Runs pre-flight checks, bumps the version on a release branch,
+# generates CHANGELOG.md, and opens a pull request against main.
+# After the PR is merged, run `just push-tag` to trigger the publish.
 release:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -69,20 +79,69 @@ release:
     cargo fmt --check
     cargo clippy --all-targets -- -W clippy::pedantic
 
-    # Bump version, update Cargo.lock, generate CHANGELOG.md, commit, and tag.
+    # Determine the next version without making any changes yet.
+    # cog bump --auto --dry-run prints e.g. "v0.1.0" to stdout.
+    echo "==> Determining next version..."
+    next_version=$(cog bump --auto --dry-run)
+    echo "    Next version: ${next_version}"
+
+    # Create and switch to a release branch.
+    release_branch="release/${next_version}"
+    git checkout -b "${release_branch}"
+
+    # Bump version, generate CHANGELOG.md, commit, and create the local tag.
     # cog bump --auto:
-    #   - Reads conventional commits since the last tag to pick major/minor/patch
     #   - Updates the version field in Cargo.toml
     #   - Writes CHANGELOG.md
-    #   - Creates a signed commit "chore(version): bump to vX.Y.Z"
-    #   - Creates an annotated tag vX.Y.Z
+    #   - Creates a commit "chore(version): bump to vX.Y.Z"
+    #   - Creates an annotated tag vX.Y.Z  (local only until push-tag)
     echo "==> Bumping version with cog..."
     cog bump --auto
 
-    # Push the bump commit and the new tag.  The tag push triggers release.yml
-    # which runs CI, publishes to crates.io, and creates a GitHub release.
-    echo "==> Pushing commit and tag..."
-    git push origin main --follow-tags
+    # Push the release branch (not the tag — that comes after PR merge).
+    echo "==> Pushing release branch..."
+    git push -u origin "${release_branch}"
+
+    # Open the pull request.
+    echo "==> Opening pull request..."
+    gh pr create \
+        --title "chore(release): ${next_version}" \
+        --body "$(cat CHANGELOG.md)" \
+        --base main \
+        --head "${release_branch}"
+
+    echo ""
+    echo "==> Release PR opened."
+    echo "    Review and merge the PR, then run:"
+    echo ""
+    echo "        just push-tag"
+    echo ""
+    echo "    to push the tag and trigger the crates.io publish."
+
+# Step 2: push the local tag created by `just release`.
+#
+# Run this after the release PR has been merged into main.
+# Pushes the annotated tag, which triggers release.yml and publishes
+# the crate to crates.io.
+push-tag:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # Find the most recent local tag that looks like a version tag.
+    tag=$(git describe --tags --abbrev=0 2>/dev/null || true)
+    if [[ -z "$tag" ]]; then
+        echo "error: no local version tag found; did you run 'just release'?" >&2
+        exit 1
+    fi
+
+    # Guard: tag must not already exist on origin.
+    if git ls-remote --tags origin "${tag}" | grep -q "${tag}"; then
+        echo "error: tag ${tag} already exists on origin" >&2
+        exit 1
+    fi
+
+    echo "==> Pushing tag ${tag}..."
+    git push origin "${tag}"
 
     echo "==> Done. Monitor the release workflow at:"
     echo "    https://github.com/anthonyoteri/serde-structprop/actions"
