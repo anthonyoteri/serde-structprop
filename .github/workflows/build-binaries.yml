@@ -67,6 +67,10 @@ jobs:
         if: runner.os != 'Windows'
         run: strip ${{ matrix.artifact_dir }}/${{ matrix.artifact }}
 
+      - name: Ad-hoc sign binary (macOS only)
+        if: runner.os == 'macOS'
+        run: codesign --sign - --force --preserve-metadata=entitlements,requirements,flags,runtime ${{ matrix.artifact_dir }}/${{ matrix.artifact }}
+
       - name: Package binary (Unix)
         if: runner.os != 'Windows'
         shell: bash
