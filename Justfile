@@ -7,16 +7,16 @@ default:
 
 # Run the full test suite
 test:
-    cargo test
+    cargo test --workspace
 
 # Check formatting and lints (mirrors CI)
 check:
-    cargo fmt --check
-    cargo clippy --all-targets -- -W clippy::pedantic
+    cargo fmt --check --all
+    cargo clippy --workspace --all-targets -- -W clippy::pedantic
 
 # Auto-format the source
 fmt:
-    cargo fmt
+    cargo fmt --all
 
 # Validate conventional commit history
 commits:
@@ -73,12 +73,12 @@ release:
 
     # Run the full test suite before touching anything.
     echo "==> Running tests..."
-    cargo test
+    cargo test --workspace
 
     # Check formatting and lints.
     echo "==> Checking formatting and lints..."
-    cargo fmt --check
-    cargo clippy --all-targets -- -W clippy::pedantic
+    cargo fmt --check --all
+    cargo clippy --workspace --all-targets -- -W clippy::pedantic
 
     # Determine the next version without making any changes yet.
     # cog bump --auto --dry-run prints e.g. "v0.1.0" to stdout.
@@ -139,8 +139,21 @@ push-tag:
     echo "==> Pulling latest main..."
     git pull --ff-only origin main
 
-    # Read the version from Cargo.toml.
-    version=$(grep -m1 '^version' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')
+    # Derive the version from crates/serde-structprop/Cargo.toml (set by
+    # `cog bump --auto` via pre_bump_hooks) and verify that
+    # structprop-validator is in lockstep.
+    version=$(grep '^version' crates/serde-structprop/Cargo.toml | head -1 \
+                | sed 's/version = "\(.*\)"/\1/')
+    if [[ -z "$version" ]]; then
+        echo "error: could not read version from crates/serde-structprop/Cargo.toml" >&2
+        exit 1
+    fi
+    val_version=$(grep '^version' crates/structprop-validator/Cargo.toml | head -1 \
+                    | sed 's/version = "\(.*\)"/\1/')
+    if [[ "$val_version" != "$version" ]]; then
+        echo "error: version mismatch — serde-structprop=${version}, structprop-validator=${val_version}" >&2
+        exit 1
+    fi
     tag="v${version}"
     echo "==> Tagging HEAD as ${tag}..."
 

@@ -1,0 +1,22 @@
+[package]
+name = "structprop-validator"
+version = "0.1.4"
+edition = "2021"
+rust-version = "1.85"
+authors = ["Anthony Oteri <anthony.oteri@gmail.com>"]
+description = "Command-line validator for structprop configuration files"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/anthonyoteri/serde-structprop"
+homepage = "https://github.com/anthonyoteri/serde-structprop"
+documentation = "https://github.com/anthonyoteri/serde-structprop/blob/main/crates/structprop-validator/README.md"
+readme = "README.md"
+keywords = ["structprop", "config", "validator", "cli"]
+categories = ["command-line-utilities", "config"]
+
+[[bin]]
+name = "structprop-validator"
+path = "src/main.rs"
+
+[dependencies]
+serde-structprop = { path = "../serde-structprop", version = "0.1.4" }
+anyhow = "1"

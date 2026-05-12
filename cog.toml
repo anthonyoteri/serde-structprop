@@ -7,7 +7,9 @@ tag_prefix = "v"
 # Update Cargo.toml version before committing the bump.
 # The .bak suffix is needed for macOS compatibility with sed -i.
 pre_bump_hooks = [
-    "sed -i.bak 's/^version = \"[^\"]*\"/version = \"{{version}}\"/' Cargo.toml && rm -f Cargo.toml.bak",
+    "sed -i.bak 's/^version = \"[^\"]*\"/version = \"{{version}}\"/' crates/serde-structprop/Cargo.toml && rm -f crates/serde-structprop/Cargo.toml.bak",
+    "sed -i.bak 's/^version = \"[^\"]*\"/version = \"{{version}}\"/' crates/structprop-validator/Cargo.toml && rm -f crates/structprop-validator/Cargo.toml.bak",
+    "sed -i.bak 's/serde-structprop = { path = \"[^\"]*\", version = \"[^\"]*\" }/serde-structprop = { path = \"..\\/serde-structprop\", version = \"{{version}}\" }/' crates/structprop-validator/Cargo.toml && rm -f crates/structprop-validator/Cargo.toml.bak",
 ]
 
 [changelog]

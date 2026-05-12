@@ -1,0 +1,34 @@
+[package]
+name = "serde-structprop"
+version = "0.1.4"
+edition = "2021"
+rust-version = "1.85"
+authors = ["Anthony Oteri <anthony.oteri@gmail.com>"]
+description = "Serde serializer and deserializer for the structprop config file format"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/anthonyoteri/serde-structprop"
+homepage = "https://github.com/anthonyoteri/serde-structprop"
+documentation = "https://docs.rs/serde-structprop"
+readme = "../../README.md"
+keywords = ["serde", "structprop", "config", "serialization"]
+categories = ["encoding", "config"]
+
+[features]
+# Enables serde's derive feature, allowing use of #[derive(Serialize, Deserialize)]
+# without adding a direct serde dependency. Requires serde to be in your own
+# [dependencies] if you need it for anything beyond derive macros.
+derive = ["serde/derive"]
+
+[dependencies]
+serde = { version = "1" }
+indexmap = { version = "2" }
+
+[dev-dependencies]
+proptest = "1"
+serde = { version = "1", features = ["derive"] }
+serde_bytes = "0.11"
+url = { version = "2", features = ["serde"] }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
