@@ -2,6 +2,14 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v0.2.0](https://github.com/anthonyoteri/serde-structprop/compare/3588ad34e7ba5891db6b04b0963971e391a6bfdc..v0.2.0) - 2026-05-12
+#### Features
+- restructure into Cargo workspace and add structprop-validator (#37) - ([d61e9fa](https://github.com/anthonyoteri/serde-structprop/commit/d61e9fa7399012f8a4d6b256c9cff72598dd6434)) - [@anthonyoteri](https://github.com/anthonyoteri)
+#### Bug Fixes
+- reject unrepresentable strings instead of emitting malformed escape sequences (#35) - ([3588ad3](https://github.com/anthonyoteri/serde-structprop/commit/3588ad34e7ba5891db6b04b0963971e391a6bfdc)) - [@anthonyoteri](https://github.com/anthonyoteri)
+
+- - -
+
 ## [v0.1.4](https://github.com/anthonyoteri/serde-structprop/compare/62e3dc154ef7e23f1b8e0aee8fd148cdd962d87e..v0.1.4) - 2026-05-12
 #### Bug Fixes
 - quote empty strings in serializer (#26) - ([ff5a8d9](https://github.com/anthonyoteri/serde-structprop/commit/ff5a8d97f001ef3d49c53542bea10c2d22bea7f1)) - [@anthonyoteri](https://github.com/anthonyoteri)
