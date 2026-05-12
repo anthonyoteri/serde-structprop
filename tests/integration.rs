@@ -1112,3 +1112,158 @@ fn ser_bytes_is_unsupported() {
     }
     assert!(to_string(&Cfg { val: b"hello" }).is_err());
 }
+
+// ---------------------------------------------------------------------------
+// Embedded-quote tests
+// The format has no escape sequences, so strings that need quoting AND
+// contain `"` are unrepresentable and must produce UnsupportedType errors.
+// A `"` inside a bare (unquoted) term is fine.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn ser_string_with_quote_requiring_quoting_is_error() {
+    // `hello "world"` contains a space AND a `"` — needs quoting but can't be.
+    #[derive(Serialize)]
+    struct Cfg {
+        expr: String,
+    }
+    assert!(matches!(
+        to_string(&Cfg {
+            expr: r#"hello "world""#.into(),
+        }),
+        Err(serde_structprop::Error::UnsupportedType(_))
+    ));
+}
+
+#[test]
+fn ser_string_with_braces_and_quote_is_error() {
+    // `metric{label=~"$var"}` contains `{`, `}` and `"` — needs quoting due
+    // to braces but cannot be represented because of the embedded `"`.
+    #[derive(Serialize)]
+    struct Cfg {
+        expr: String,
+    }
+    assert!(matches!(
+        to_string(&Cfg {
+            expr: r#"metric{label=~"$var"}"#.into(),
+        }),
+        Err(serde_structprop::Error::UnsupportedType(_))
+    ));
+}
+
+#[test]
+fn ser_string_with_bare_quote_is_ok() {
+    // `hello"world` has no special chars other than `"`, so it can be
+    // emitted as a bare term — no quoting needed, no error.
+    #[derive(Serialize)]
+    struct Cfg {
+        val: String,
+    }
+    let out = to_string(&Cfg {
+        val: r#"hello"world"#.into(),
+    })
+    .unwrap();
+    assert_eq!(out, "val = hello\"world\n");
+}
+
+#[test]
+fn ser_string_with_leading_quote_is_error() {
+    // A value starting with `"` is unrepresentable: the lexer always treats
+    // a leading `"` as the start of a quoted string, so it would be
+    // mis-parsed even though there are no other special characters.
+    #[derive(Serialize)]
+    struct Cfg {
+        val: String,
+    }
+    assert!(matches!(
+        to_string(&Cfg {
+            val: r#""hello"#.into(),
+        }),
+        Err(serde_structprop::Error::UnsupportedType(_))
+    ));
+}
+
+// ---------------------------------------------------------------------------
+// Formatting tests — objects inside arrays
+// ---------------------------------------------------------------------------
+
+#[test]
+fn ser_vec_of_structs_exact() {
+    // Matches Python structprop.dumps output exactly: each struct item is
+    // wrapped in inner `{ … }` braces, fields indented two extra spaces.
+    #[derive(Serialize)]
+    struct Inner {
+        x: u32,
+        y: u32,
+    }
+    #[derive(Serialize)]
+    struct Outer {
+        items: Vec<Inner>,
+    }
+    let o = Outer {
+        items: vec![Inner { x: 1, y: 2 }, Inner { x: 3, y: 4 }],
+    };
+    let out = to_string(&o).unwrap();
+    assert_eq!(
+        out, "items = {\n  {\n    x = 1\n    y = 2\n  }\n  {\n    x = 3\n    y = 4\n  }\n}\n",
+        "got:\n{out}"
+    );
+}
+
+#[test]
+fn roundtrip_vec_of_structs() {
+    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    struct Inner {
+        name: String,
+        value: u32,
+    }
+    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    struct Outer {
+        items: Vec<Inner>,
+    }
+    let original = Outer {
+        items: vec![
+            Inner {
+                name: "a".into(),
+                value: 1,
+            },
+            Inner {
+                name: "b".into(),
+                value: 2,
+            },
+        ],
+    };
+    let serialized = to_string(&original).unwrap();
+    let deserialized: Outer = from_str(&serialized).unwrap();
+    assert_eq!(original, deserialized);
+}
+
+#[test]
+fn ser_nested_vec_of_structs_indentation() {
+    // Objects nested inside a top-level object's array field should have
+    // their indentation pushed in by the correct number of levels.
+    #[derive(Serialize)]
+    struct Member {
+        name: String,
+    }
+    #[derive(Serialize)]
+    struct Team {
+        team_name: String,
+        members: Vec<Member>,
+    }
+    let t = Team {
+        team_name: "eng".into(),
+        members: vec![
+            Member {
+                name: "alice".into(),
+            },
+            Member { name: "bob".into() },
+        ],
+    };
+    let out = to_string(&t).unwrap();
+    assert_eq!(
+        out,
+        "team_name = eng\nmembers = {\n  {\n    name = alice\n  }\n  {\n    name = bob\n  }\n}\n",
+        "got:\n{out}"
+    );
+}
