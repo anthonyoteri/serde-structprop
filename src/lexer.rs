@@ -12,7 +12,7 @@
 //! | `{` | `Token::Open` |
 //! | `}` | `Token::Close` |
 //! | `# … \n` | *(discarded)* |
-//! | `"…"` | `Token::Term` with the quoted content |
+//! | `"…"` | `Token::Term` with the quoted content (no escape sequences; `"` cannot appear inside a quoted term) |
 //! | any other non-whitespace run | `Token::Term` |
 //! | end of input | `Token::Eof` |
 
@@ -23,7 +23,8 @@ pub enum Token {
     ///
     /// Bare terms are delimited by whitespace or the special characters
     /// `=`, `{`, `}`, and `#`.  Quoted terms may contain any character
-    /// except an unescaped `"`.
+    /// except `"` — the format has no escape sequences, so a `"` character
+    /// always terminates the quoted string.
     Term(String),
 
     /// The assignment operator `=`.

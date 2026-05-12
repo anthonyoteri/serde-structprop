@@ -41,7 +41,15 @@ list = {
 
 **Special characters** in values (spaces, tabs, newlines, carriage returns,
 `#`, `{`, `}`, `=`) must be wrapped in double quotes.  Empty strings are
-always quoted as `""`.  Keys follow the same rule.
+always quoted as `""`.  The structprop format has no escape sequences.
+A `"` character in the *interior* of an otherwise-bare value is emitted
+as-is (e.g. `hello"world` → `val = hello"world`).  Two cases are
+unrepresentable and produce a serialization error:
+
+- A value that requires quoting *and* contains `"` (no way to embed `"` inside a quoted term).
+- A value whose first character is `"` (the lexer treats a leading `"` as the start of a quoted string).
+
+Keys follow the same rule.
 
 ## Installation
 
@@ -71,7 +79,7 @@ serde-structprop = "0.1"
 | `i8` `i16` `i32` `i64` `u8` `u16` `u32` `u64` | bare integer scalar (e.g. `42`, `-7`) |
 | `f32`, `f64` | bare float scalar (e.g. `3.14`) |
 | `char` | bare single-character scalar |
-| `String` / `&str` | bare scalar, or `"quoted"` when it contains special chars or is empty |
+| `String` / `&str` | bare scalar, or `"quoted"` when it contains special chars or is empty; a `"` mixed with other special chars is unrepresentable (serialization error) |
 | `Option<T>` (Some) | the inner value serialized normally |
 | `Option<T>` (None) / `()` | `null` |
 | newtype struct (e.g. `struct Meters(f64)`) | transparent — serializes as the inner type |
@@ -196,7 +204,14 @@ fn main() {
 
 Values containing spaces, tabs, newlines, or the special characters
 (`#`, `{`, `}`, `=`) are quoted automatically on output and must be
-quoted in the input.  Empty strings are always quoted as `""`:
+quoted in the input.  Empty strings are always quoted as `""`.
+
+The structprop format has **no escape sequences**.  A `"` in the *interior*
+of an otherwise-bare value is emitted as-is (e.g. `hello"world` →
+`val = hello"world`).  Two cases are unrepresentable and return an error:
+a value that requires quoting *and* contains `"`, and a value whose first
+character is `"` (the lexer always interprets a leading `"` as the start
+of a quoted string).
 
 ```rust
 use serde::{Deserialize, Serialize};

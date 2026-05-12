@@ -12,7 +12,7 @@
 //! | `i8`–`i64`, `u8`–`u64` | bare integer scalar (e.g. `42`, `-7`) |
 //! | `f32`, `f64` | bare float scalar (e.g. `3.14`) |
 //! | `char` | bare single-character scalar (quoted if the character is special) |
-//! | `String` / `&str` | bare scalar, or `"quoted"` if it contains spaces, tabs, newlines, carriage returns, `#`, `{`, `}`, `=`, or is empty |
+//! | `String` / `&str` | bare scalar, or `"quoted"` if it contains spaces, tabs, newlines, carriage returns, `#`, `{`, `}`, or `=`, or is empty; yields `Error::UnsupportedType` if the value requires quoting and contains `"`, or if the value starts with `"` |
 //! | `None` / `()` / unit struct | `null` scalar |
 //! | newtype struct | transparent — serializes as the inner value |
 //! | struct / map | `key { … }` block at the current indentation level |
@@ -74,6 +74,10 @@ pub struct Serializer {
     pub(crate) output: String,
     /// Current indentation level in spaces.
     indent: usize,
+    /// Set to `true` when the top-level call was `serialize_struct` or
+    /// `serialize_map`.  Used by [`SeqSerializer`] to distinguish object
+    /// items (which must be wrapped in inner `{ … }` braces) from scalars.
+    is_object: bool,
 }
 
 impl Serializer {
@@ -82,6 +86,7 @@ impl Serializer {
         Serializer {
             output: String::new(),
             indent,
+            is_object: false,
         }
     }
 
@@ -103,19 +108,38 @@ impl Serializer {
 /// empty value would produce `key = ` with no token after `=`, which the
 /// parser cannot recover from.
 ///
-/// The structprop format has no escape sequences. A `"` character can appear
-/// inside a *bare* (unquoted) term, but not inside a *quoted* term. Therefore,
-/// strings that both require quoting (contain a special character) and contain
-/// a literal `"` will serialize to syntactically ambiguous output. Such strings
-/// cannot round-trip through this format.
-fn escape(s: &str) -> String {
-    if s.is_empty()
+/// The structprop format has no escape sequences.  A `"` character that
+/// appears in the interior of a value (not as the first character) can
+/// survive as part of a bare (unquoted) term.  However two cases are
+/// unrepresentable and return [`Error::UnsupportedType`]:
+///
+/// * A value that **requires quoting** (contains a special character or is
+///   empty) **and also contains `"`** — there is no way to embed `"` inside
+///   a quoted term.
+/// * A value whose **first character is `"`** — the lexer always interprets
+///   a leading `"` as the start of a quoted term, so the value would be
+///   mis-parsed.
+///
+/// # Errors
+///
+/// Returns [`Error::UnsupportedType`] if `s` requires quoting and also
+/// contains a `"` character.
+fn escape(s: &str) -> Result<String> {
+    let needs_quoting = s.is_empty()
+        || s.starts_with('"')
         || s.chars()
-            .any(|c| matches!(c, ' ' | '\t' | '\n' | '\r' | '#' | '{' | '}' | '='))
-    {
-        format!("\"{s}\"")
+            .any(|c| matches!(c, ' ' | '\t' | '\n' | '\r' | '#' | '{' | '}' | '='));
+
+    if needs_quoting && s.contains('"') {
+        return Err(Error::UnsupportedType(
+            "string containing '\"' cannot be represented in quoted form (format has no escape sequences)",
+        ));
+    }
+
+    if needs_quoting {
+        Ok(format!("\"{s}\""))
     } else {
-        s.to_owned()
+        Ok(s.to_owned())
     }
 }
 
@@ -189,12 +213,12 @@ impl<'a> ser::Serializer for &'a mut Serializer {
 
     fn serialize_char(self, v: char) -> Result<()> {
         // Route through escape() so special characters are quoted.
-        self.output.push_str(&escape(&v.to_string()));
+        self.output.push_str(&escape(&v.to_string())?);
         Ok(())
     }
 
     fn serialize_str(self, v: &str) -> Result<()> {
-        self.output.push_str(&escape(v));
+        self.output.push_str(&escape(v)?);
         Ok(())
     }
 
@@ -290,6 +314,7 @@ impl<'a> ser::Serializer for &'a mut Serializer {
     }
 
     fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap> {
+        self.is_object = true;
         Ok(MapSerializer {
             ser: self,
             current_key: None,
@@ -324,8 +349,9 @@ impl<'a> ser::Serializer for &'a mut Serializer {
 /// then emits them as a `{ … }` block.
 pub struct SeqSerializer<'a> {
     parent: &'a mut Serializer,
-    /// Each element serialized to a string, accumulated for deferred emission.
-    items: Vec<String>,
+    /// Each element serialized to a string plus a flag indicating whether it
+    /// is a struct/map (object) that needs wrapping in inner `{ … }` braces.
+    items: Vec<(bool, String)>,
     /// Set for tuple variants: the variant name to wrap the array under.
     variant: Option<String>,
 }
@@ -337,17 +363,33 @@ impl ser::SerializeSeq for SeqSerializer<'_> {
     fn serialize_element<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<()> {
         let mut inner = Serializer::new(0);
         value.serialize(&mut inner)?;
-        self.items.push(inner.output);
+        self.items.push((inner.is_object, inner.output));
         Ok(())
     }
 
     fn end(self) -> Result<()> {
         let pad = self.parent.pad();
         let inner_pad = " ".repeat(self.parent.indent + 2);
+        let deep_pad = " ".repeat(self.parent.indent + 4);
         writeln!(self.parent.output, "{{").map_err(|e| Error::Message(e.to_string()))?;
-        for item in &self.items {
-            writeln!(self.parent.output, "{inner_pad}{item}")
-                .map_err(|e| Error::Message(e.to_string()))?;
+        for (is_object, item) in &self.items {
+            let trimmed = item.trim_end();
+            if *is_object {
+                // Struct/map item: wrap in inner `{ … }` braces, indenting each
+                // field line by an extra two spaces (matching the Python reference).
+                writeln!(self.parent.output, "{inner_pad}{{")
+                    .map_err(|e| Error::Message(e.to_string()))?;
+                for line in trimmed.lines() {
+                    writeln!(self.parent.output, "{deep_pad}{line}")
+                        .map_err(|e| Error::Message(e.to_string()))?;
+                }
+                writeln!(self.parent.output, "{inner_pad}}}")
+                    .map_err(|e| Error::Message(e.to_string()))?;
+            } else {
+                // Scalar item: emit on a single indented line.
+                writeln!(self.parent.output, "{inner_pad}{trimmed}")
+                    .map_err(|e| Error::Message(e.to_string()))?;
+            }
         }
         writeln!(self.parent.output, "{pad}}}").map_err(|e| Error::Message(e.to_string()))
     }
@@ -395,11 +437,24 @@ impl ser::SerializeTupleVariant for SeqSerializer<'_> {
         })?;
         let pad = self.parent.pad();
         let inner_pad = " ".repeat(self.parent.indent + 2);
-        writeln!(self.parent.output, "{pad}{} = {{", escape(&variant))
+        let deep_pad = " ".repeat(self.parent.indent + 4);
+        writeln!(self.parent.output, "{pad}{} = {{", escape(&variant)?)
             .map_err(|e| Error::Message(e.to_string()))?;
-        for item in &self.items {
-            writeln!(self.parent.output, "{inner_pad}{item}")
-                .map_err(|e| Error::Message(e.to_string()))?;
+        for (is_object, item) in &self.items {
+            let trimmed = item.trim_end();
+            if *is_object {
+                writeln!(self.parent.output, "{inner_pad}{{")
+                    .map_err(|e| Error::Message(e.to_string()))?;
+                for line in trimmed.lines() {
+                    writeln!(self.parent.output, "{deep_pad}{line}")
+                        .map_err(|e| Error::Message(e.to_string()))?;
+                }
+                writeln!(self.parent.output, "{inner_pad}}}")
+                    .map_err(|e| Error::Message(e.to_string()))?;
+            } else {
+                writeln!(self.parent.output, "{inner_pad}{trimmed}")
+                    .map_err(|e| Error::Message(e.to_string()))?;
+            }
         }
         writeln!(self.parent.output, "{pad}}}").map_err(|e| Error::Message(e.to_string()))
     }
@@ -591,7 +646,7 @@ impl MapSerializer<'_> {
             // blindly re-indent the first-pass output line-by-line because
             // doing so would corrupt any quoted scalar whose value contains a
             // literal newline (the continuation line is not a separate field).
-            writeln!(self.ser.output, "{pad}{} {{", escape(key))
+            writeln!(self.ser.output, "{pad}{} {{", escape(key)?)
                 .map_err(|e| Error::Message(e.to_string()))?;
             let mut inner = Serializer::new(indent + 2);
             value.serialize(&mut inner)?;
@@ -605,14 +660,14 @@ impl MapSerializer<'_> {
             writeln!(
                 self.ser.output,
                 "{pad}{} = {}",
-                escape(key),
+                escape(key)?,
                 rendered.trim_end()
             )
             .map_err(|e| Error::Message(e.to_string()))?;
         } else {
             // Scalar (no newlines, or a quoted scalar — both fit on one line).
             let rendered = rendered.trim_end_matches('\n');
-            writeln!(self.ser.output, "{pad}{} = {rendered}", escape(key))
+            writeln!(self.ser.output, "{pad}{} = {rendered}", escape(key)?)
                 .map_err(|e| Error::Message(e.to_string()))?;
         }
         Ok(())
@@ -642,7 +697,7 @@ impl ser::SerializeMap for MapSerializer<'_> {
         if let Some(variant) = self.variant_name {
             // Wrap the content we already wrote in `variant { … }`.
             let pad = " ".repeat(self.ser.indent.saturating_sub(2));
-            let header = format!("{pad}{} {{\n", escape(&variant));
+            let header = format!("{pad}{} {{\n", escape(&variant)?);
             let footer = format!("{pad}}}\n");
             self.ser.output.insert_str(0, &header);
             self.ser.output.push_str(&footer);
