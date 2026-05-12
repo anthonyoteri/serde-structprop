@@ -470,13 +470,10 @@ fn ser_struct_variant_does_not_corrupt_preceding_fields() {
         shape: Shape::Circle { radius: 5 },
     };
     let out = to_string(&cfg).unwrap();
-    // "name" must appear before "Circle" — insert_str(0) bug put the variant
-    // header at position 0, before any previously-written fields.
-    let pos_name = out.find("name").expect("missing 'name'");
-    let pos_circle = out.find("Circle").expect("missing 'Circle'");
-    assert!(
-        pos_name < pos_circle,
-        "'name' should appear before 'Circle', got:\n{out}"
+    assert_eq!(
+        out,
+        "name = test\nshape {\n  Circle {\n    radius = 5\n  }\n}\n",
+        "struct-variant header must appear at the correct position, got:\n{out}"
     );
 }
 
