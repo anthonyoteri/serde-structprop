@@ -8,6 +8,7 @@ description = "Command-line validator for structprop configuration files"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/anthonyoteri/serde-structprop"
 homepage = "https://github.com/anthonyoteri/serde-structprop"
+readme = "README.md"
 keywords = ["structprop", "config", "validator", "cli"]
 categories = ["command-line-utilities", "config"]
 
