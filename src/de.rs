@@ -211,7 +211,14 @@ impl<'de> de::Deserializer<'de> for ValueDeserializer {
     }
 
     fn deserialize_unit<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
-        visitor.visit_unit()
+        if self.0.is_null() {
+            visitor.visit_unit()
+        } else {
+            Err(Error::Parse(format!(
+                "expected null, found {}",
+                self.0.type_name()
+            )))
+        }
     }
 
     fn deserialize_unit_struct<V: Visitor<'de>>(
@@ -219,7 +226,7 @@ impl<'de> de::Deserializer<'de> for ValueDeserializer {
         _name: &'static str,
         visitor: V,
     ) -> Result<V::Value> {
-        visitor.visit_unit()
+        self.deserialize_unit(visitor)
     }
 
     fn deserialize_newtype_struct<V: Visitor<'de>>(

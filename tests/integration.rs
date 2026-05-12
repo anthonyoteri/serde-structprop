@@ -692,3 +692,29 @@ fn de_option_field_absent_defaults_to_none() {
     let s: S = from_str("name = foo\n").unwrap();
     assert_eq!(s.count, None);
 }
+
+// deserialize_unit must reject non-null values, and accept "null"
+#[test]
+fn de_unit_field_roundtrip() {
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct Doc {
+        key: (),
+    }
+    // "null" is the structprop representation of a unit value — must succeed.
+    let doc: Doc = from_str("key = null\n").expect("expected Ok deserializing null as unit");
+    assert_eq!(doc.key, ());
+
+    // Any non-null scalar must be rejected when the target type is unit.
+    let err: Result<Doc, _> = from_str("key = hello\n");
+    assert!(err.is_err(), "expected error deserializing non-null as unit");
+}
+
+// serialize_key must return KeyMustBeString for integer keys
+#[test]
+fn ser_non_string_map_key_is_an_error() {
+    use std::collections::HashMap;
+    let mut map = HashMap::new();
+    map.insert(42u32, "hello");
+    let result = to_string(&map);
+    assert!(result.is_err(), "expected error serializing integer map key");
+}

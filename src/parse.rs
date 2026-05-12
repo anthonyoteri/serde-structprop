@@ -303,6 +303,17 @@ impl Value {
     pub fn is_null(&self) -> bool {
         matches!(self, Value::Scalar(s) if s == "null")
     }
+
+    /// Returns a short human-readable name for the variant, used in error
+    /// messages.
+    #[must_use]
+    pub fn type_name(&self) -> &'static str {
+        match self {
+            Value::Scalar(_) => "scalar",
+            Value::Array(_) => "array",
+            Value::Object(_) => "object",
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
