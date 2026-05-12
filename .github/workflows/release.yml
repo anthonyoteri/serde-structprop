@@ -89,3 +89,71 @@ jobs:
             --notes-file /tmp/release_notes.md
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # -------------------------------------------------------------------------
+  # Build structprop-validator binaries and attach them to the GitHub release.
+  # Runs in parallel across platforms after the release is created.
+  # -------------------------------------------------------------------------
+  build-binaries:
+    name: Build binary (${{ matrix.asset_name }})
+    needs: publish
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact: structprop-validator
+            asset_name: structprop-validator-linux-x86_64
+            target: x86_64-unknown-linux-musl
+            artifact_dir: target/x86_64-unknown-linux-musl/release
+          - os: macos-13
+            artifact: structprop-validator
+            asset_name: structprop-validator-macos-x86_64
+            target: ""
+            artifact_dir: target/release
+          - os: macos-latest
+            artifact: structprop-validator
+            asset_name: structprop-validator-macos-aarch64
+            target: ""
+            artifact_dir: target/release
+          - os: windows-latest
+            artifact: structprop-validator.exe
+            asset_name: structprop-validator-windows-x86_64.exe
+            target: ""
+            artifact_dir: target/release
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install musl tools (Linux only)
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: sudo apt-get install -y musl-tools
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build release binary
+        run: >
+          cargo build --release -p structprop-validator
+          ${{ matrix.target != '' && format('--target {0}', matrix.target) || '' }}
+
+      - name: Strip binary (Unix only)
+        if: runner.os != 'Windows'
+        run: strip ${{ matrix.artifact_dir }}/${{ matrix.artifact }}
+
+      - name: Upload binary to GitHub release
+        run: >
+          gh release upload "${{ github.ref_name }}"
+          "${{ matrix.artifact_dir }}/${{ matrix.artifact }}#${{ matrix.asset_name }}"
+          --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
