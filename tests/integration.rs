@@ -527,6 +527,31 @@ fn ser_string_with_newline_is_quoted() {
     assert_eq!(back, s);
 }
 
+// Nested struct containing a string with a newline must round-trip correctly.
+// Regression for write_kv re-indent bug: blindly prefixing every line with
+// spaces would corrupt the continuation lines of a quoted multi-line scalar.
+#[test]
+fn roundtrip_nested_struct_with_newline_string() {
+    #[derive(Serialize, Deserialize, PartialEq, Debug)]
+    struct Inner {
+        msg: String,
+    }
+    #[derive(Serialize, Deserialize, PartialEq, Debug)]
+    struct Outer {
+        name: String,
+        inner: Inner,
+    }
+    let orig = Outer {
+        name: "test".into(),
+        inner: Inner {
+            msg: "hello\nworld".into(),
+        },
+    };
+    let out = to_string(&orig).unwrap();
+    let back: Outer = from_str(&out).unwrap();
+    assert_eq!(back, orig, "round-trip failed; output was:\n{out}");
+}
+
 // Cycle 4: serialize_char must quote structprop special characters
 #[test]
 fn ser_char_special_chars_are_quoted() {

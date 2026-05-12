@@ -94,10 +94,11 @@ impl Serializer {
 /// (space, tab, newline, carriage return, `#`, `{`, `}`, or `=`); otherwise
 /// return it unchanged.
 ///
-/// Note: the structprop format has no escape sequences, so embedded `"` characters
-/// inside a value are not representable. Values containing `"` are returned
-/// wrapped in quotes with the inner `"` intact — callers should avoid such values
-/// or the round-trip will be lossy.
+/// The structprop format has no escape sequences. A `"` character can appear
+/// inside a *bare* (unquoted) term, but not inside a *quoted* term. Therefore,
+/// strings that both require quoting (contain a special character) and contain
+/// a literal `"` will serialize to syntactically ambiguous output. Such strings
+/// cannot round-trip through this format.
 fn escape(s: &str) -> String {
     if s.chars()
         .any(|c| matches!(c, ' ' | '\t' | '\n' | '\r' | '#' | '{' | '}' | '='))
@@ -379,9 +380,9 @@ impl ser::SerializeTupleVariant for SeqSerializer<'_> {
     fn end(self) -> Result<()> {
         // Emit as `variant = { item1\n  item2\n … }` so the parser produces
         // Object({"variant": Array([…])}), matching what deserialize_enum expects.
-        let variant = self
-            .variant
-            .expect("variant name must be set for SerializeTupleVariant");
+        let variant = self.variant.ok_or_else(|| {
+            Error::Message("variant name missing in SerializeTupleVariant::end".into())
+        })?;
         let pad = self.parent.pad();
         let inner_pad = " ".repeat(self.parent.indent + 2);
         writeln!(self.parent.output, "{pad}{} = {{", escape(&variant))
@@ -414,38 +415,39 @@ impl MapSerializer<'_> {
         let indent = self.ser.indent;
         let pad = " ".repeat(indent);
 
-        // Render at indent=0 so SeqSerializer / MapSerializer do not add their
-        // own base indentation; we re-apply `pad` below.
-        let mut inner = Serializer::new(0);
-        value.serialize(&mut inner)?;
-        let rendered = inner.output;
+        // Probe the value type by rendering at indent=0 into a throwaway buffer.
+        // We only use this to decide which syntactic form to emit; the actual
+        // content is then (re-)serialized at the correct indentation so we never
+        // blindly re-indent individual lines (which would corrupt quoted strings
+        // that contain embedded newlines).
+        let mut probe = Serializer::new(0);
+        value.serialize(&mut probe)?;
+        let rendered = probe.output;
 
         if rendered.contains('\n')
             && !rendered.trim_start().starts_with('{')
             && !rendered.trim_start().starts_with('"')
         {
-            // Multi-line object block → `key {\n  …lines re-indented…\n}\n`
+            // Multi-line object block → `key {\n  <fields at indent+2>\n}\n`
+            // Re-serialize at the correct child indentation so nested fields
+            // and their values are placed correctly without manual line-by-line
+            // re-indenting (which would corrupt quoted strings with newlines).
             writeln!(self.ser.output, "{pad}{} {{", escape(key))
                 .map_err(|e| Error::Message(e.to_string()))?;
-            for line in rendered.lines() {
-                writeln!(self.ser.output, "{pad}  {line}")
-                    .map_err(|e| Error::Message(e.to_string()))?;
-            }
+            let mut inner = Serializer::new(indent + 2);
+            value.serialize(&mut inner)?;
+            self.ser.output.push_str(&inner.output);
             writeln!(self.ser.output, "{pad}}}").map_err(|e| Error::Message(e.to_string()))?;
         } else if rendered.contains('\n') {
             // Multi-line array block starting with `{`.
-            // First line (`{`) goes inline with `key = `; remaining lines get
-            // `pad` prepended so items sit at `indent+2` and `}` at `indent`.
-            let mut lines = rendered.lines();
-            let first = lines.next().unwrap_or("{");
-            writeln!(self.ser.output, "{pad}{} = {first}", escape(key))
+            // Re-serialize at the current indentation so item lines and the
+            // closing `}` are placed at `indent+2` / `indent` respectively.
+            let mut inner = Serializer::new(indent);
+            value.serialize(&mut inner)?;
+            writeln!(self.ser.output, "{pad}{} = {}", escape(key), inner.output.trim_end())
                 .map_err(|e| Error::Message(e.to_string()))?;
-            for line in lines {
-                writeln!(self.ser.output, "{pad}{line}")
-                    .map_err(|e| Error::Message(e.to_string()))?;
-            }
         } else {
-            // Scalar (no newlines at all).
+            // Scalar (no newlines, or a quoted scalar — both fit on one line).
             let rendered = rendered.trim_end_matches('\n');
             writeln!(self.ser.output, "{pad}{} = {rendered}", escape(key))
                 .map_err(|e| Error::Message(e.to_string()))?;
