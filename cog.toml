@@ -4,6 +4,13 @@
 ignore_merge_commits = true
 tag_prefix = "v"
 
+# Update Cargo.toml version before committing the bump.
+# The .bak suffix is needed for macOS compatibility with sed -i.
+pre_bump_hooks = [
+    "sed -i.bak 's/^version = \"[^\"]*\"/version = \"{{version}}\"/' Cargo.toml && rm -f Cargo.toml.bak",
+    "cargo build --locked --quiet",
+]
+
 [changelog]
 path = "CHANGELOG.md"
 template = "remote"
@@ -24,4 +31,3 @@ test     = { changelog_title = "Tests" }
 chore    = { changelog_title = "Miscellaneous" }
 ci       = { changelog_title = "CI", omit_from_changelog = true }
 style    = { changelog_title = "Style", omit_from_changelog = true }
-
