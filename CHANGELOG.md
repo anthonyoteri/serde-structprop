@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v0.2.1](https://github.com/anthonyoteri/serde-structprop/compare/58fc6923830c675d1599ec497cdf6dd9c5345f22..v0.2.1) - 2026-05-12
+#### Bug Fixes
+- struct-variant header inserted at wrong position and indent (#40) - ([da33551](https://github.com/anthonyoteri/serde-structprop/commit/da33551bfb86f4ec598cff4a3bcfd1e37320106d)) - [@anthonyoteri](https://github.com/anthonyoteri)
+
+- - -
+
 ## [v0.2.0](https://github.com/anthonyoteri/serde-structprop/compare/3588ad34e7ba5891db6b04b0963971e391a6bfdc..v0.2.0) - 2026-05-12
 #### Features
 - restructure into Cargo workspace and add structprop-validator (#37) - ([d61e9fa](https://github.com/anthonyoteri/serde-structprop/commit/d61e9fa7399012f8a4d6b256c9cff72598dd6434)) - [@anthonyoteri](https://github.com/anthonyoteri)
