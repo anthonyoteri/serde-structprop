@@ -399,8 +399,10 @@ impl ser::SerializeTupleVariant for SeqSerializer<'_> {
 // KeySerializer – accepts only string keys; rejects everything else
 // ---------------------------------------------------------------------------
 
-/// A minimal serializer that collects a string key and returns
-/// [`Error::KeyMustBeString`] for any non-string type.
+/// A minimal serializer that collects a `str`/`String` map key and returns
+/// [`Error::KeyMustBeString`] for every other type, including `char` and
+/// unit-enum variants.  Only `serialize_str` (and `serialize_newtype_struct`
+/// delegating to it) succeed.
 struct KeySerializer(String);
 
 impl ser::Serializer for &mut KeySerializer {
@@ -452,9 +454,8 @@ impl ser::Serializer for &mut KeySerializer {
     fn serialize_f64(self, _v: f64) -> Result<()> {
         Err(Error::KeyMustBeString)
     }
-    fn serialize_char(self, v: char) -> Result<()> {
-        self.0 = v.to_string();
-        Ok(())
+    fn serialize_char(self, _v: char) -> Result<()> {
+        Err(Error::KeyMustBeString)
     }
     fn serialize_bytes(self, _v: &[u8]) -> Result<()> {
         Err(Error::KeyMustBeString)
@@ -475,10 +476,9 @@ impl ser::Serializer for &mut KeySerializer {
         self,
         _name: &'static str,
         _idx: u32,
-        variant: &'static str,
+        _variant: &'static str,
     ) -> Result<()> {
-        variant.clone_into(&mut self.0);
-        Ok(())
+        Err(Error::KeyMustBeString)
     }
     fn serialize_newtype_struct<T: Serialize + ?Sized>(
         self,

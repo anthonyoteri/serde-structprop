@@ -712,15 +712,25 @@ fn de_unit_field_roundtrip() {
     );
 }
 
-// serialize_key must return KeyMustBeString for integer keys
+// serialize_key must return KeyMustBeString for non-string key types.
+// Only str/String keys are accepted; char and enum variants are rejected too.
 #[test]
 fn ser_non_string_map_key_is_an_error() {
     use std::collections::HashMap;
-    let mut map = HashMap::new();
-    map.insert(42u32, "hello");
-    let result = to_string(&map);
+
+    // Integer key
+    let mut int_map: HashMap<u32, &str> = HashMap::new();
+    int_map.insert(42, "hello");
     assert!(
-        result.is_err(),
+        to_string(&int_map).is_err(),
         "expected error serializing integer map key"
+    );
+
+    // char key
+    let mut char_map: HashMap<char, &str> = HashMap::new();
+    char_map.insert('x', "hello");
+    assert!(
+        to_string(&char_map).is_err(),
+        "expected error serializing char map key"
     );
 }
