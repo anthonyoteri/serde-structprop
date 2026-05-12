@@ -580,11 +580,11 @@ fn de_unterminated_quoted_string_is_an_error() {
 fn de_large_integer_is_not_silently_coerced_to_float() {
     // u64::MAX cannot be represented as i64; previously deserialize_any would
     // fall through i64 parse failure → f64 parse, silently losing precision.
-    let input = format!("val = {}\n", u64::MAX);
     #[derive(Debug, Deserialize)]
     struct S {
         val: u64,
     }
+    let input = format!("val = {}\n", u64::MAX);
     let s: S = from_str(&input).unwrap();
     assert_eq!(s.val, u64::MAX);
 }
