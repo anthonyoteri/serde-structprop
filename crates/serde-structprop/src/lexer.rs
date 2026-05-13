@@ -143,6 +143,13 @@ pub fn tokenize(input: &str) -> crate::error::Result<Vec<(Token, u32)>> {
         }
     }
 
+    // A quoted string that was never closed is a syntax error.
+    if state == State::Quoted {
+        return Err(crate::error::Error::Parse(format!(
+            "line {token_line}: unterminated quoted string"
+        )));
+    }
+
     tokens.push((Token::Eof, line));
     Ok(tokens)
 }
@@ -297,5 +304,29 @@ mod tests {
         // allocate, so we test with a saturated counter by constructing a
         // minimal reproduction using inc_line directly.
         assert!(inc_line(u32::MAX).is_err());
+    }
+
+    #[test]
+    fn unterminated_quoted_string_reports_line_number() {
+        // A quoted string that never closes should produce a clear error
+        // naming the line it started on, not a downstream parse error.
+        let err = tokenize("key = \"unterminated").unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("unterminated quoted string"),
+            "expected 'unterminated quoted string' in error: {msg}"
+        );
+        assert!(
+            msg.contains("line 1"),
+            "expected line number in error: {msg}"
+        );
+    }
+
+    #[test]
+    fn unterminated_quoted_string_multiline_reports_correct_line() {
+        // The error should report the line on which the quote *opened*.
+        let err = tokenize("a = 1\nb = \"unterminated").unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("line 2"), "expected 'line 2' in error: {msg}");
     }
 }

@@ -62,6 +62,37 @@ pub fn from_str<T: DeserializeOwned>(input: &str) -> Result<T> {
     T::deserialize(ValueDeserializer(value))
 }
 
+/// Deserialize an instance of `T` from an already-parsed [`Value`] tree.
+///
+/// This is useful when you have called [`crate::parse()`] directly and want to
+/// avoid re-parsing the input, or when you need to deserialize the same
+/// document into more than one type.
+///
+/// # Errors
+///
+/// Returns [`Error::Parse`] if the value does not match the expected shape or
+/// type of `T` (e.g. an array where a scalar is required), or
+/// [`Error::Message`] for serde-generated errors such as missing required
+/// fields or unknown variants.
+///
+/// # Examples
+///
+/// ```
+/// use serde::Deserialize;
+/// use serde_structprop::{parse, de::from_value};
+///
+/// #[derive(Deserialize, PartialEq, Debug)]
+/// struct Config { host: String, port: u16 }
+///
+/// let value = parse("host = localhost\nport = 9000\n").unwrap();
+/// let cfg: Config = from_value(value).unwrap();
+/// assert_eq!(cfg.host, "localhost");
+/// assert_eq!(cfg.port, 9000);
+/// ```
+pub fn from_value<T: DeserializeOwned>(value: Value) -> Result<T> {
+    T::deserialize(ValueDeserializer(value))
+}
+
 // ---------------------------------------------------------------------------
 // ValueDeserializer
 // ---------------------------------------------------------------------------

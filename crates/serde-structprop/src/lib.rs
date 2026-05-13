@@ -70,7 +70,7 @@ pub mod parse;
 /// Serde serializer for structprop documents.
 pub mod ser;
 
-pub use de::from_str;
+pub use de::{from_str, from_value};
 pub use error::{Error, Result};
 pub use parse::{parse, Value};
 pub use ser::to_string;
