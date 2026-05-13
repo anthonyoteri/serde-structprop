@@ -32,6 +32,10 @@ fn run(args: &[String]) -> Result<()> {
             print_usage();
             Ok(())
         }
+        [path] if path == "--version" || path == "-V" => {
+            println!("structprop-validator {}", env!("CARGO_PKG_VERSION"));
+            Ok(())
+        }
         paths => {
             // One or more file arguments
             let mut had_error = false;

@@ -362,6 +362,31 @@ impl Value {
         matches!(self, Value::Scalar(s) if s == "null")
     }
 
+    /// Return the inner string of a [`Value::Scalar`], or `None` for other
+    /// variants.
+    ///
+    /// This complements [`Value::as_bool`], [`Value::as_i64`], and
+    /// [`Value::as_f64`] for cases where the raw string value is needed.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use serde_structprop::parse::{parse, Value};
+    ///
+    /// let v = parse("greeting = hello\n").unwrap();
+    /// if let Value::Object(map) = v {
+    ///     assert_eq!(map["greeting"].as_str(), Some("hello"));
+    /// }
+    /// ```
+    #[must_use]
+    pub fn as_str(&self) -> Option<&str> {
+        if let Value::Scalar(s) = self {
+            Some(s)
+        } else {
+            None
+        }
+    }
+
     /// Returns a short human-readable name for the variant, used in error
     /// messages.
     #[must_use]
