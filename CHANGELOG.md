@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v0.4.0](https://github.com/anthonyoteri/serde-structprop/compare/95c47e68d69e55efb1491153f1da941296cebab7..v0.4.0) - 2026-05-18
+#### Features
+- (**parser**) report opening brace line in unterminated block errors (#48) - ([95c47e6](https://github.com/anthonyoteri/serde-structprop/commit/95c47e68d69e55efb1491153f1da941296cebab7)) - [@anthonyoteri](https://github.com/anthonyoteri)
+
+- - -
+
 ## [v0.3.0](https://github.com/anthonyoteri/serde-structprop/compare/52caaf802ce8c72827db6ff20a9af35ed96f096b..v0.3.0) - 2026-05-13
 #### Features
 - ergonomics improvements to justify a minor version bump (#46) - ([26c7004](https://github.com/anthonyoteri/serde-structprop/commit/26c7004b088b73d68b88cff65562e4248e2a161d)) - [@anthonyoteri](https://github.com/anthonyoteri)
