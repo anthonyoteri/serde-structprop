@@ -85,7 +85,9 @@ pub enum Value {
 pub fn parse(input: &str) -> Result<Value> {
     let tokens = tokenize(input)?;
     let mut pos = 0usize;
-    let map = parse_object(&tokens, &mut pos, /*top_level=*/ true)?;
+    let map = parse_object(
+        &tokens, &mut pos, /*top_level=*/ true, /*open_line=*/ 0,
+    )?;
     Ok(Value::Object(map))
 }
 
@@ -147,6 +149,8 @@ fn expect_term(tokens: &[(Token, u32)], pos: &mut usize) -> Result<String> {
 ///
 /// * If `top_level` is `true`, parsing stops at [`Token::Eof`].
 /// * If `top_level` is `false`, parsing stops at `}` (which is consumed).
+///   `open_line` must be the source line of the opening `{` so that the EOF
+///   error can point back to where the block started.
 ///
 /// # Errors
 ///
@@ -155,6 +159,7 @@ fn parse_object(
     tokens: &[(Token, u32)],
     pos: &mut usize,
     top_level: bool,
+    open_line: u32,
 ) -> Result<IndexMap<String, Value>> {
     let mut map = IndexMap::new();
 
@@ -166,7 +171,7 @@ fn parse_object(
                     break;
                 }
                 return Err(Error::Parse(format!(
-                    "line {line}: unexpected EOF inside object"
+                    "line {line}: unexpected EOF inside object opened on line {open_line}"
                 )));
             }
             Token::Close => {
@@ -191,8 +196,9 @@ fn parse_object(
                         map.insert(key, val);
                     }
                     Token::Open => {
+                        let open_line = line_at(tokens, *pos);
                         advance(pos); // consume '{'
-                        let sub = parse_object(tokens, pos, /*top_level=*/ false)?;
+                        let sub = parse_object(tokens, pos, /*top_level=*/ false, open_line)?;
                         if map.contains_key(&key) {
                             return Err(Error::Parse(format!(
                                 "line {after_line}: duplicate key '{key}'"
@@ -229,8 +235,9 @@ fn parse_value(tokens: &[(Token, u32)], pos: &mut usize) -> Result<Value> {
     let line = line_at(tokens, *pos);
     match peek(tokens, *pos) {
         Token::Open => {
+            let open_line = line_at(tokens, *pos);
             advance(pos); // consume '{'
-            parse_array_or_object_list(tokens, pos)
+            parse_array_or_object_list(tokens, pos, open_line)
         }
         Token::Term(_) => {
             let s = expect_term(tokens, pos)?;
@@ -250,10 +257,17 @@ fn parse_value(tokens: &[(Token, u32)], pos: &mut usize) -> Result<Value> {
 /// - A list of `{ … }` sub-objects → [`Value::Array`] of [`Value::Object`]s.
 /// - A mix of both.
 ///
+/// `open_line` is the source line of the opening `{` and is used in EOF
+/// error messages to point back to where the block started.
+///
 /// # Errors
 ///
 /// Returns [`Error::Parse`] on unexpected tokens or premature EOF.
-fn parse_array_or_object_list(tokens: &[(Token, u32)], pos: &mut usize) -> Result<Value> {
+fn parse_array_or_object_list(
+    tokens: &[(Token, u32)],
+    pos: &mut usize,
+    open_line: u32,
+) -> Result<Value> {
     let mut items: Vec<Value> = Vec::new();
 
     loop {
@@ -265,13 +279,14 @@ fn parse_array_or_object_list(tokens: &[(Token, u32)], pos: &mut usize) -> Resul
             }
             Token::Eof => {
                 return Err(Error::Parse(format!(
-                    "line {line}: unexpected EOF inside array"
+                    "line {line}: unexpected EOF inside array opened on line {open_line}"
                 )));
             }
             Token::Open => {
                 // A nested object literal inside an array: { key = val … }
+                let inner_open_line = line_at(tokens, *pos);
                 advance(pos); // consume '{'
-                let sub = parse_object(tokens, pos, /*top_level=*/ false)?;
+                let sub = parse_object(tokens, pos, /*top_level=*/ false, inner_open_line)?;
                 items.push(Value::Object(sub));
             }
             Token::Term(_) => {
@@ -473,6 +488,43 @@ mod tests {
         assert!(
             err.contains("line "),
             "expected a line number in error: {err}"
+        );
+    }
+
+    #[test]
+    fn unterminated_object_reports_opening_brace_line() {
+        // The opening `{` is on line 2; EOF is reached on line 3.
+        // The error should name the line where the block was opened.
+        let input = "good = ok\nbad {\n  key = value\n";
+        let err = parse(input).unwrap_err().to_string();
+        assert!(
+            err.contains("opened on line 2"),
+            "expected opening brace line in error: {err}"
+        );
+    }
+
+    #[test]
+    fn unterminated_array_reports_opening_brace_line() {
+        // The opening `{` is on line 1; EOF is reached on line 2.
+        let input = "list = {\n  item1\n";
+        let err = parse(input).unwrap_err().to_string();
+        assert!(
+            err.contains("opened on line 1"),
+            "expected opening brace line in error: {err}"
+        );
+    }
+
+    #[test]
+    fn deeply_nested_unterminated_object_reports_correct_opening_line() {
+        // The outer block's `{` is on line 1.  The inner block's `{` is on
+        // line 2.  Neither block is closed, so the parser hits EOF while
+        // inside the inner object.  The error should reference line 2 (the
+        // opening of the innermost unclosed block).
+        let input = "outer {\n  inner {\n    key = value\n";
+        let err = parse(input).unwrap_err().to_string();
+        assert!(
+            err.contains("opened on line 2"),
+            "expected inner opening brace line in error: {err}"
         );
     }
 
