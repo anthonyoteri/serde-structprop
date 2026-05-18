@@ -66,7 +66,7 @@ jobs:
           fetch-depth: 0
 
       - name: Check conventional commits
-        uses: cocogitto/cocogitto-action@v3
+        uses: cocogitto/cocogitto-action@v4
         with:
           check: true
           # On PRs check only the commits introduced by the PR.
@@ -85,7 +85,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install cocogitto
-        uses: cocogitto/cocogitto-action@v3
+        uses: cocogitto/cocogitto-action@v4
         with:
           check: false
           release: false
