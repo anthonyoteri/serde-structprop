@@ -2,144 +2,97 @@ name: CI
 
 on:
   push:
-    branches: ["main"]
+    branches: [main]
+    paths:
+      - "**/*.rs"
+      - "**/Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/ci.yml"
   pull_request:
+    branches: [main]
+    paths:
+      - "**/*.rs"
+      - "**/Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/ci.yml"
   workflow_call:
 
-env:
-  CARGO_TERM_COLOR: always
-  RUSTFLAGS: "-D warnings"
+permissions:
+  contents: read
 
 jobs:
+  fmt:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all --check
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy --workspace --all-targets -- -W clippy::pedantic -D warnings
+
+  docs:
+    name: Docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo doc --no-deps --workspace
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+
   test:
-    name: Test (${{ matrix.os }})
+    name: Test (${{ matrix.os }}, Rust ${{ matrix.rust }})
     runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.rust == 'nightly' }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+        rust:
+          - "1.85"   # MSRV
+          - stable
+          - nightly
     steps:
       - uses: actions/checkout@v6
-
-      - name: Install stable toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
-
-      - name: Build
-        run: cargo build --all-targets
-
-      - name: Run tests
-        run: cargo test
-
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Install stable toolchain with clippy and rustfmt
-        uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
         with:
-          components: clippy, rustfmt
-
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
-
-      - name: Check formatting
-        run: cargo fmt --check
-
-      - name: Clippy
-        run: cargo clippy --all-targets -- -W clippy::pedantic
-
-  commits:
-    name: Conventional commits
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v6
+          toolchain: ${{ matrix.rust }}
+      - uses: Swatinem/rust-cache@v2
         with:
-          # Full history is required for cog check to validate all commits.
-          fetch-depth: 0
-
-      - name: Check conventional commits
-        uses: cocogitto/cocogitto-action@v3
-        with:
-          check: true
-          # On PRs check only the commits introduced by the PR.
-          # On pushes to main check only commits since the previous HEAD.
-          from: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
-
-  changelog:
-    name: Verify changelog
-    runs-on: ubuntu-latest
-    # Only run on pushes to main, not on PRs.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Install cocogitto
-        uses: cocogitto/cocogitto-action@v3
-        with:
-          check: false
-          release: false
-
-      - name: Verify changelog generation
-        # Confirm that cog can generate a changelog from the current history.
-        # The authoritative CHANGELOG.md is produced locally by maintainers
-        # running `cog bump --auto` before pushing a version tag; it is not
-        # written by CI because main is branch-protected.
-        run: cog changelog > CHANGELOG.md
+          key: ${{ matrix.rust }}
+      - run: cargo test --workspace
 
   semver:
     name: Semver compatibility
     runs-on: ubuntu-latest
-    # Only meaningful on PRs — compares the PR branch against the published
-    # crate version to catch accidental breaking API changes.
     if: github.event_name == 'pull_request'
-
     steps:
       - uses: actions/checkout@v6
-
-      - name: Install stable toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
-
-      - name: Check semver compatibility
-        uses: obi1kenobi/cargo-semver-checks-action@v2
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: obi1kenobi/cargo-semver-checks-action@v2
         with:
           package: serde-structprop
 
   deny:
     name: Cargo deny
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v6
-
-      - name: Check licenses, advisories, and bans
-        uses: EmbarkStudios/cargo-deny-action@v2
-
-  msrv:
-    name: MSRV
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Install Rust 1.85
-        uses: dtolnay/rust-toolchain@1.85
-
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
-
-      - name: Check MSRV builds
-        run: cargo check
+      - uses: EmbarkStudios/cargo-deny-action@v2

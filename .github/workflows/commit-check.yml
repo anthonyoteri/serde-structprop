@@ -1,0 +1,24 @@
+name: Conventional Commits
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Check commits
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: cocogitto/cocogitto-action@v4.2.0
+        with:
+          command: check
+          # On PRs check only the commits introduced by the PR.
+          # On pushes to main check only commits since the previous HEAD.
+          args: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}..HEAD
