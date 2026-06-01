@@ -65,7 +65,7 @@ jobs:
           - macos-latest
           - windows-latest
         rust:
-          - "1.85"   # MSRV
+          - "1.87"   # MSRV
           - stable
           - nightly
     steps:

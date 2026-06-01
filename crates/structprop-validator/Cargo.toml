@@ -2,7 +2,7 @@
 name = "structprop-validator"
 version = "0.4.0"
 edition = "2021"
-rust-version = "1.85"
+rust-version = "1.87"
 authors = ["Anthony Oteri <anthony.oteri@gmail.com>"]
 description = "Command-line validator for structprop configuration files"
 license = "MIT OR Apache-2.0"
