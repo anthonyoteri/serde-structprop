@@ -1,6 +1,6 @@
 //! Lexer (tokenizer) for the structprop format.
 //!
-//! The lexer converts a raw `&str` into a flat sequence of [`Token`]s paired
+//! The lexer converts a raw `&str` into a flat sequence of [`Token`](crate::lexer::Token)s paired
 //! with their 1-indexed source line numbers.  Comments and insignificant
 //! whitespace are stripped.  The resulting token stream is consumed by
 //! [`crate::parse()`].
